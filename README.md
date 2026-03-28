@@ -2,6 +2,30 @@
   <img src="assets/banner.png" alt="iOS Agent Skills" width="100%">
 </p>
 
+<p align="center">
+  <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://img.shields.io/github/stars/rusel95/ios-agent-skills?style=flat-square&color=yellow" alt="stars"/></a>
+  <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://img.shields.io/github/forks/rusel95/ios-agent-skills?style=flat-square&color=blue" alt="forks"/></a>
+  <img src="https://img.shields.io/badge/skills-8-purple?style=flat-square" alt="skills"/>
+  <img src="https://img.shields.io/badge/models_tested-3-teal?style=flat-square" alt="models"/>
+  <img src="https://img.shields.io/badge/assertions-549-orange?style=flat-square" alt="assertions"/>
+  <img src="https://img.shields.io/badge/scenarios-161-green?style=flat-square" alt="scenarios"/>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square" alt="license"/></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/SwiftUI_MVVM-+76%25_Gemini-007AFF?style=for-the-badge&logo=swift&logoColor=white" alt="swiftui-mvvm"/>
+  <img src="https://img.shields.io/badge/UIKit_MVVM-+55%25_Gemini-34C759?style=for-the-badge&logo=swift&logoColor=white" alt="uikit-mvvm"/>
+  <img src="https://img.shields.io/badge/GCD-+47%25_Sonnet-5AC8FA?style=for-the-badge&logo=swift&logoColor=white" alt="gcd"/>
+  <img src="https://img.shields.io/badge/Testing-+44%25_Sonnet-FFD60A?style=for-the-badge&logo=swift&logoColor=black" alt="testing"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Concurrency-+36%25_Gemini-FF2D55?style=for-the-badge&logo=swift&logoColor=white" alt="concurrency"/>
+  <img src="https://img.shields.io/badge/Security-+30%25_Sonnet-FF3B30?style=for-the-badge&logo=swift&logoColor=white" alt="security"/>
+  <img src="https://img.shields.io/badge/TCA-+26%25_Sonnet-AF52DE?style=for-the-badge&logo=swift&logoColor=white" alt="tca"/>
+  <img src="https://img.shields.io/badge/VIPER-+13%25_Sonnet-FF9500?style=for-the-badge&logo=swift&logoColor=white" alt="viper"/>
+</p>
+
 # iOS Agent Skills
 
 Production-tested iOS Agent Skills for Claude Code, Codex, and 40+ AI coding tools.

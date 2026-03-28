@@ -1,0 +1,15 @@
+{
+  "name": "ios-agent-skills",
+  "version": "1.0.0",
+  "description": "Production-tested iOS Agent Skills — 8 enterprise-grade skills for architecture, concurrency, testing, and security.",
+  "skills": [
+    "./skills/swiftui-mvvm",
+    "./skills/uikit-mvvm",
+    "./skills/viper-uikit",
+    "./skills/tca-swiftui",
+    "./skills/swift-concurrency",
+    "./skills/gcd-operations",
+    "./skills/ios-testing",
+    "./skills/ios-security"
+  ]
+}

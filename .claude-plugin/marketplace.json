@@ -1,0 +1,86 @@
+{
+  "name": "ios-agent-skills",
+  "owner": {
+    "name": "Ruslan Popesku",
+    "url": "https://github.com/rusel95"
+  },
+  "metadata": {
+    "description": "Production-tested iOS Agent Skills — 8 enterprise-grade skills covering SwiftUI MVVM, UIKit MVVM, VIPER, TCA, Swift Concurrency, GCD, Testing, and Security Audit.",
+    "version": "1.0.0",
+    "tags": ["ios", "swift", "agent-skills", "claude-code", "swiftui", "uikit", "viper", "tca", "concurrency", "testing", "security"]
+  },
+  "plugins": [
+    {
+      "name": "ios-all",
+      "description": "All 8 iOS skills: swiftui-mvvm, uikit-mvvm, viper-uikit, tca-swiftui, swift-concurrency, gcd-operations, ios-testing, ios-security.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/swiftui-mvvm",
+        "./skills/uikit-mvvm",
+        "./skills/viper-uikit",
+        "./skills/tca-swiftui",
+        "./skills/swift-concurrency",
+        "./skills/gcd-operations",
+        "./skills/ios-testing",
+        "./skills/ios-security"
+      ]
+    },
+    {
+      "name": "swiftui-mvvm",
+      "description": "SwiftUI MVVM architecture with @Observable (iOS 17+). Use when creating SwiftUI screens, migrating from ObservableObject, setting up Router navigation, or writing ViewModel tests.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/swiftui-mvvm"]
+    },
+    {
+      "name": "uikit-mvvm",
+      "description": "UIKit MVVM architecture with Combine (iOS 13+). Use when refactoring MVC to MVVM, setting up Coordinators, implementing Combine bindings, or adopting DiffableDataSource.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/uikit-mvvm"]
+    },
+    {
+      "name": "viper-uikit",
+      "description": "UIKit VIPER architecture (iOS 13+). Use when building VIPER modules, decomposing god ViewControllers, fixing retain cycles, or testing Presenters/Interactors.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/viper-uikit"]
+    },
+    {
+      "name": "tca-swiftui",
+      "description": "The Composable Architecture with SwiftUI (iOS 16+, TCA 1.7+). Use when building @Reducer features, writing TestStore tests, or migrating legacy TCA code.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/tca-swiftui"]
+    },
+    {
+      "name": "swift-concurrency",
+      "description": "Swift Concurrency (iOS 13+). Use when writing async/await, diagnosing data races, fixing actor isolation, migrating to Swift 6, or handling Sendable conformance.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/swift-concurrency"]
+    },
+    {
+      "name": "gcd-operations",
+      "description": "GCD & OperationQueue (iOS 13+). Use when writing DispatchQueue code, fixing deadlocks, preventing thread explosion, or migrating GCD to Swift Concurrency.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/gcd-operations"]
+    },
+    {
+      "name": "ios-testing",
+      "description": "iOS Testing across all architectures. Use when writing tests, migrating XCTest to Swift Testing, diagnosing flaky tests, or auditing coverage.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/ios-testing"]
+    },
+    {
+      "name": "ios-security",
+      "description": "iOS Security Audit against OWASP MASVS v2.1.0. Use when reviewing code for vulnerabilities, auditing Keychain usage, checking ATS, or mapping compliance.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/ios-security"]
+    }
+  ]
+}

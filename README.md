@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="iOS Agent Skills" width="100%">
+</p>
+
 # iOS Agent Skills
 
 Production-tested iOS Agent Skills for Claude Code, Codex, and 40+ AI coding tools.

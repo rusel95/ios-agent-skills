@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://visitor-badge.laobi.icu/badge?page_id=rusel95.ios-agent-skills&left_color=gray&right_color=blue&left_text=visitors" alt="visitors"/></a>
   <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://img.shields.io/github/stars/rusel95/ios-agent-skills?style=flat-square&color=yellow" alt="stars"/></a>
   <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://img.shields.io/github/forks/rusel95/ios-agent-skills?style=flat-square&color=blue" alt="forks"/></a>
   <img src="https://img.shields.io/badge/skills-8-purple?style=flat-square" alt="skills"/>

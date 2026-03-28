@@ -1,0 +1,643 @@
+{
+  "skill_name": "swift-concurrency",
+  "eval_structure": "reference-file × difficulty (simple/medium/complex)",
+  "evals": [
+    {
+      "id": 1,
+      "reference": "cooperative-pool",
+      "difficulty": "simple",
+      "name": "cooperative-pool-simple",
+      "prompt": "Why is this code dangerous in an async context?\n\n```swift\nfunc fetchData() async -> Data {\n    var result: Data?\n    let semaphore = DispatchSemaphore(value: 0)\n    URLSession.shared.dataTask(with: url) { data, _, _ in\n        result = data\n        semaphore.signal()\n    }.resume()\n    semaphore.wait()\n    return result!\n}\n```",
+      "expected_output": "semaphore.wait() blocks a cooperative thread. The cooperative pool is capped at CPU core count (4-10 on iPhones). Under load all threads can be waiting, starving the pool and causing deadlock. Fix: use withCheckedThrowingContinuation to avoid blocking.",
+      "assertions": [
+        {
+          "id": "CP1.1",
+          "text": "Identifies semaphore.wait() blocks the cooperative thread pool",
+          "rationale": "Core anti-pattern from crash-patterns.md"
+        },
+        {
+          "id": "CP1.2",
+          "text": "Mentions the cooperative pool is capped at CPU core count (4-10 threads on iPhones)",
+          "discriminating": true,
+          "rationale": "Specific pool constraint from skill — baseline typically omits the thread cap number"
+        },
+        {
+          "id": "CP1.3",
+          "text": "Recommends withCheckedContinuation or withCheckedThrowingContinuation as the fix",
+          "rationale": "Skill's prescribed fix over Unsafe continuation"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "reference": "cooperative-pool",
+      "difficulty": "medium",
+      "name": "cooperative-pool-medium",
+      "prompt": "Find all concurrency issues in this async function:\n\n```swift\nfunc processFile(at url: URL) async throws -> String {\n    Thread.sleep(forTimeInterval: 0.5)\n    let content = try String(contentsOf: url)\n    return content\n}\n```",
+      "expected_output": "Two blocking calls in an async context: (1) Thread.sleep blocks the cooperative thread — replace with Task.sleep(for:). (2) String(contentsOf:) is synchronous blocking file I/O that stalls a cooperative thread — wrap in a DispatchQueue + withCheckedContinuation or use an async file API to move the blocking work off the cooperative pool.",
+      "assertions": [
+        {
+          "id": "CP2.1",
+          "text": "Identifies Thread.sleep blocks the cooperative thread (should use Task.sleep)",
+          "rationale": "Common blocking call inside async function"
+        },
+        {
+          "id": "CP2.2",
+          "text": "Identifies String(contentsOf:) is synchronous blocking I/O in an async context",
+          "discriminating": true,
+          "rationale": "Skill explicitly lists sync file I/O as a cooperative pool blocker — baseline often misses this"
+        },
+        {
+          "id": "CP2.3",
+          "text": "Recommends wrapping the blocking I/O in a DispatchQueue + continuation or using an async file API",
+          "rationale": "Correct fix for blocking I/O in async context from skill"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "reference": "cooperative-pool",
+      "difficulty": "complex",
+      "name": "cooperative-pool-complex",
+      "prompt": "Our app's watchdog kills us intermittently under load. Analyze this image processor:\n\n```swift\nfunc processAllImages(_ urls: [URL]) async -> [UIImage] {\n    var results: [UIImage] = []\n    await withTaskGroup(of: UIImage?.self) { group in\n        for url in urls {  // 500 URLs\n            group.addTask {\n                let data = try? Data(contentsOf: url)  // Sync file I/O\n                return data.flatMap { UIImage(data: $0) }\n            }\n        }\n        for await image in group {\n            if let image { results.append(image) }\n        }\n    }\n    return results\n}\n```",
+      "expected_output": "Two compounding issues: (1) Data(contentsOf:) is synchronous blocking I/O — all 500 child tasks immediately block their cooperative threads, exhausting the pool and triggering watchdog. (2) All 500 tasks are added without throttling — should limit concurrent tasks to ProcessInfo.processInfo.activeProcessorCount. Fix: use URLSession async API or wrap Data(contentsOf:) in a DispatchQueue + continuation, and throttle the TaskGroup so only N tasks run at once.",
+      "assertions": [
+        {
+          "id": "CP3.1",
+          "text": "Identifies Data(contentsOf:) is blocking I/O inside TaskGroup child tasks",
+          "discriminating": true,
+          "rationale": "Compound issue: blocking I/O inside TaskGroup — skill covers this specifically"
+        },
+        {
+          "id": "CP3.2",
+          "text": "Identifies 500 unbounded tasks cause cooperative pool exhaustion and watchdog kills",
+          "rationale": "Unbounded TaskGroup growth is a crash pattern from skill"
+        },
+        {
+          "id": "CP3.3",
+          "text": "Recommends throttling child tasks to ProcessInfo.processInfo.activeProcessorCount",
+          "discriminating": true,
+          "rationale": "Skill's specific throttle target — baseline may say 'limit tasks' without the exact API"
+        },
+        {
+          "id": "CP3.4",
+          "text": "Recommends URLSession async API or DispatchQueue + continuation wrapper for file I/O",
+          "rationale": "Correct fix for blocking I/O inside cooperative pool"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "reference": "actor-isolation",
+      "difficulty": "simple",
+      "name": "actor-isolation-simple",
+      "prompt": "What's wrong with this actor usage?\n\n```swift\nactor UserStore {\n    var currentUser: User?\n    var userCount: Int = 0\n}\n\nlet store = UserStore()\nstore.userCount += 1\nprint(store.currentUser?.name)\n```",
+      "expected_output": "Actor state cannot be accessed synchronously from outside. Both store.userCount += 1 and store.currentUser?.name require await — the actor serializes access across its isolation boundary. Callers must use await store.userCount, or better, define mutation methods on the actor.",
+      "assertions": [
+        {
+          "id": "AI1.1",
+          "text": "Identifies that actor state requires await from outside the actor",
+          "rationale": "Fundamental actor isolation rule"
+        },
+        {
+          "id": "AI1.2",
+          "text": "Notes that both read (currentUser) and read-modify-write (userCount += 1) need await",
+          "rationale": "Common misconception that reads are free — they are not"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "reference": "actor-isolation",
+      "difficulty": "medium",
+      "name": "actor-isolation-medium",
+      "prompt": "This actor cache causes duplicate network requests. Find the bug:\n\n```swift\nactor DataCache {\n    private var cache: [URL: Data] = [:]\n\n    func data(for url: URL) async throws -> Data {\n        if let cached = cache[url] {\n            return cached\n        }\n        // Cache miss — fetch\n        let data = try await URLSession.shared.data(from: url).0\n        cache[url] = data\n        return data\n    }\n}\n```",
+      "expected_output": "Actor reentrancy: at the await suspension point (URLSession.shared.data), another caller can enter data(for:) for the same URL, find no cached value, and start a second fetch. Both callers download the same URL in parallel. Fix: use in-flight Task coalescing — store a Task<Data, Error> per URL in a separate dictionary. New callers await the existing task instead of starting a new fetch.",
+      "assertions": [
+        {
+          "id": "AI2.1",
+          "text": "Identifies actor reentrancy at the await suspension point causes duplicate fetches",
+          "rationale": "Core actor reentrancy concept from skill"
+        },
+        {
+          "id": "AI2.2",
+          "text": "Recommends in-flight Task coalescing using a [URL: Task<Data, Error>] dictionary",
+          "discriminating": true,
+          "rationale": "Specific coalescing pattern from actor-isolation.md — baseline may say 'add a flag' which is insufficient"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "reference": "actor-isolation",
+      "difficulty": "complex",
+      "name": "actor-isolation-complex",
+      "prompt": "Swift 6 gives multiple warnings on this ViewModel. Identify and fix all isolation issues:\n\n```swift\n@MainActor\nfinal class FeedViewModel: ObservableObject {\n    @Published var items: [FeedItem] = []\n    var backgroundTask: Task<Void, Never>?\n\n    init() {\n        backgroundTask = Task.detached { [weak self] in\n            guard let self else { return }\n            let fetched = await APIClient.shared.fetchFeed()\n            self.items = fetched  // ⚠ Warning\n        }\n    }\n\n    deinit {\n        backgroundTask?.cancel()  // ⚠ Warning\n    }\n}\n```",
+      "expected_output": "Three isolation issues: (1) Task.detached strips caller isolation — the closure runs nonisolated, so assigning self.items (a @MainActor property) from a detached task is a Swift 6 isolation crossing. Use Task {} instead to inherit @MainActor. (2) deinit is always nonisolated — accessing backgroundTask (a @MainActor-isolated property) from deinit is unsafe in Swift 6. Fix: add an explicit cleanup() method annotated @MainActor, call it from .onDisappear. (3) For deinit cleanup in Swift 6.1+, isolated deinit is available; before that, store a weak reference or use a nonisolated(unsafe) var with careful documentation.",
+      "assertions": [
+        {
+          "id": "AI3.1",
+          "text": "Identifies Task.detached strips @MainActor isolation — should use Task {} to inherit caller's actor",
+          "discriminating": true,
+          "rationale": "Task.detached vs Task {} isolation distinction is a key skill rule"
+        },
+        {
+          "id": "AI3.2",
+          "text": "Identifies deinit is nonisolated and accessing @MainActor-isolated property from deinit is unsafe in Swift 6",
+          "discriminating": true,
+          "rationale": "Nonisolated deinit is explicitly covered in actor-isolation.md — baseline often misses it"
+        },
+        {
+          "id": "AI3.3",
+          "text": "Recommends explicit cleanup() method called from .onDisappear as the fix for deinit isolation",
+          "rationale": "Skill's prescribed fix for @MainActor deinit access"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "reference": "sendable",
+      "difficulty": "simple",
+      "name": "sendable-simple",
+      "prompt": "What's wrong with this Sendable conformance?\n\n```swift\nfinal class SessionManager: @unchecked Sendable {\n    var authToken: String = \"\"\n    var refreshToken: String = \"\"\n\n    func updateTokens(auth: String, refresh: String) {\n        authToken = auth\n        refreshToken = refresh\n    }\n}\n```",
+      "expected_output": "@unchecked Sendable with no synchronization means the compiler trusts you but provides no protection — concurrent calls to updateTokens and reads of authToken/refreshToken are a data race at runtime. Fix: use actor (async access) or Mutex<State> / NSLock for synchronous access. Never use @unchecked Sendable without explicit synchronization.",
+      "assertions": [
+        {
+          "id": "SE1.1",
+          "text": "Identifies @unchecked Sendable with no synchronization creates a runtime data race",
+          "rationale": "Core @unchecked Sendable danger from sendable-transfer.md"
+        },
+        {
+          "id": "SE1.2",
+          "text": "Recommends actor or Mutex/NSLock as the fix",
+          "rationale": "Skill prescribes these as safe alternatives"
+        },
+        {
+          "id": "SE1.3",
+          "text": "Notes the compiler trusts @unchecked Sendable — no safety guarantee at compile time",
+          "discriminating": true,
+          "rationale": "Key distinction: compiler trusts the annotation, runtime has no protection — baseline may miss this framing"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "reference": "sendable",
+      "difficulty": "medium",
+      "name": "sendable-medium",
+      "prompt": "Swift 6 gives 'sending risks causing data races' on this code. Explain why and fix it:\n\n```swift\nclass AnalyticsService {\n    var eventQueue: [AnalyticsEvent] = []\n\n    func track(_ event: AnalyticsEvent) {\n        Task {\n            await self.sendToServer(event)\n            self.eventQueue.append(event)  // ⚠\n        }\n    }\n\n    private func sendToServer(_ event: AnalyticsEvent) async { /* ... */ }\n}\n```",
+      "expected_output": "AnalyticsService is a non-Sendable reference type. Task {} captures self and sends it across an isolation boundary — Swift 6 requires the captured value to be Sendable. Additionally, self.eventQueue.append(event) creates a data race: the Task runs concurrently with any other caller. Fix options: (1) Convert to actor (safest), (2) Add @MainActor isolation if this is a UI-adjacent service, (3) Use Mutex<[AnalyticsEvent]> to protect eventQueue if staying as a class.",
+      "assertions": [
+        {
+          "id": "SE2.1",
+          "text": "Identifies AnalyticsService is non-Sendable and cannot be safely captured across isolation boundaries",
+          "rationale": "Non-Sendable class in Task is a Swift 6 error"
+        },
+        {
+          "id": "SE2.2",
+          "text": "Identifies eventQueue.append from Task creates a data race with concurrent callers",
+          "rationale": "Mutable state accessed from concurrent context"
+        },
+        {
+          "id": "SE2.3",
+          "text": "Recommends actor as the primary fix, or @MainActor / Mutex as alternatives",
+          "discriminating": true,
+          "rationale": "Skill provides a decision tree for isolation choice — baseline may only suggest one option"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "reference": "sendable",
+      "difficulty": "complex",
+      "name": "sendable-complex",
+      "prompt": "This Swift package compiles with warnings about Sendable. Explain all issues:\n\n```swift\n// Module A (public API)\npublic final class RequestConfig {\n    public var endpoint: URL\n    public var headers: [String: String] = [:]\n    public var retryCount: Int = 3\n\n    public init(endpoint: URL) {\n        self.endpoint = endpoint\n    }\n}\n\npublic actor NetworkClient {\n    public func perform(_ config: RequestConfig) async throws -> Data {\n        // ...\n    }\n}\n\n// Module B\nlet config = RequestConfig(endpoint: url)\nconfig.headers[\"Authorization\"] = \"Bearer \\(token)\"\nlet data = try await client.perform(config)  // Warning: sending non-Sendable\n```",
+      "expected_output": "Two issues: (1) RequestConfig is a mutable class — the compiler does not infer Sendable for public types across module boundaries even if all stored properties happen to be Sendable. When config crosses the actor boundary into NetworkClient.perform(), Swift 6 requires it to be Sendable. Fix: make RequestConfig a struct (value type, implicitly Sendable once all stored properties are Sendable for public API, explicit Sendable conformance still recommended). (2) Alternative: add sending parameter to perform(_ config: sending RequestConfig) — allows non-Sendable types to transfer ownership across the boundary for that one call. Choosing between struct and sending depends on whether mutation after creation is needed.",
+      "assertions": [
+        {
+          "id": "SE3.1",
+          "text": "Explains compiler does not infer Sendable for public types across module boundaries",
+          "discriminating": true,
+          "rationale": "Public type inference gap from sendable-transfer.md — commonly misunderstood"
+        },
+        {
+          "id": "SE3.2",
+          "text": "Identifies mutable class crossing actor boundary requires Sendable conformance",
+          "rationale": "Core cross-isolation Sendable requirement"
+        },
+        {
+          "id": "SE3.3",
+          "text": "Recommends converting to struct as the primary fix",
+          "rationale": "Value types are implicitly Sendable when properties are Sendable"
+        },
+        {
+          "id": "SE3.4",
+          "text": "Mentions sending parameter as an alternative for transferring ownership of non-Sendable types",
+          "discriminating": true,
+          "rationale": "sending keyword from sendable-transfer.md — baseline rarely knows this Swift 6 escape hatch"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "reference": "asyncstream",
+      "difficulty": "simple",
+      "name": "asyncstream-simple",
+      "prompt": "What's wrong with this AsyncStream?\n\n```swift\nfunc locationStream() -> AsyncStream<CLLocation> {\n    AsyncStream { continuation in\n        let manager = CLLocationManager()\n        let delegate = LocationDelegate()\n        delegate.onLocation = { location in\n            continuation.yield(location)\n        }\n        manager.startUpdatingLocation()\n    }\n}\n```",
+      "expected_output": "Three issues: (1) continuation.finish() is never called — the stream never terminates, leaking all captured resources. (2) No onTermination handler — when the consumer cancels, the CLLocationManager keeps running. (3) manager is created locally without a retained reference — it will be deallocated immediately after the closure returns, stopping location updates before they begin.",
+      "assertions": [
+        {
+          "id": "AS1.1",
+          "text": "Identifies missing continuation.finish() causes the stream to never terminate",
+          "rationale": "Core AsyncStream leak from asyncstream-memory.md"
+        },
+        {
+          "id": "AS1.2",
+          "text": "Identifies missing onTermination handler — CLLocationManager keeps running after consumer cancels",
+          "discriminating": true,
+          "rationale": "onTermination for cleanup is specifically prescribed in asyncstream-memory.md"
+        },
+        {
+          "id": "AS1.3",
+          "text": "Notes CLLocationManager is created without a retained reference and will be immediately deallocated",
+          "rationale": "Object lifetime issue in the AsyncStream initializer closure"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "reference": "asyncstream",
+      "difficulty": "medium",
+      "name": "asyncstream-medium",
+      "prompt": "This notification stream leaks and the consumer Task never stops. Find all issues:\n\n```swift\nclass NotificationService {\n    private var continuation: AsyncStream<AppNotification>.Continuation?\n\n    var stream: AsyncStream<AppNotification> {\n        AsyncStream { continuation in\n            self.continuation = continuation\n            NotificationCenter.default.addObserver(\n                forName: .newNotification,\n                object: nil,\n                queue: nil\n            ) { [weak self] note in\n                self?.continuation?.yield(AppNotification(note))\n            }\n        }\n    }\n\n    func startConsuming() {\n        Task {\n            for await notification in stream {\n                await handle(notification)\n            }\n        }\n    }\n}\n```",
+      "expected_output": "Three issues: (1) The unstructured Task in startConsuming() is never cancelled — it keeps running even after NotificationService deinits, because the stream never finishes. (2) The NotificationCenter observer is never removed — no onTermination handler to call removeObserver when the stream is cancelled. (3) self.continuation = continuation creates a reference cycle: continuation retains the closure which captures self via the weak reference, but self also holds the continuation. Store the observer token and remove it in onTermination.",
+      "assertions": [
+        {
+          "id": "AS2.1",
+          "text": "Identifies the unstructured Task in startConsuming is never cancelled — runs indefinitely",
+          "rationale": "Unstructured Task without cancellation is a leak"
+        },
+        {
+          "id": "AS2.2",
+          "text": "Identifies missing onTermination to remove the NotificationCenter observer",
+          "discriminating": true,
+          "rationale": "onTermination for observer cleanup is the prescribed pattern from asyncstream-memory.md"
+        },
+        {
+          "id": "AS2.3",
+          "text": "Identifies retain cycle between self, continuation, and the observer closure",
+          "rationale": "AsyncStream continuation capture creates cycles"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "reference": "asyncstream",
+      "difficulty": "complex",
+      "name": "asyncstream-complex",
+      "prompt": "This event processing pipeline OOMs under high throughput. Find all issues:\n\n```swift\nfunc processEventStream(_ stream: AsyncStream<Event>) async {\n    await withTaskGroup(of: Void.self) { group in\n        for await event in stream {\n            group.addTask {\n                await processEvent(event)  // Takes ~200ms each\n            }\n        }\n        await group.waitForAll()\n    }\n}\n```",
+      "expected_output": "Three issues: (1) Regular TaskGroup with Void child tasks still accumulates child task metadata in memory until iterated — for fire-and-forget use withDiscardingTaskGroup, which releases child results immediately. (2) No backpressure: if the stream produces events faster than processEvent consumes them, the group grows without bound — should limit concurrent tasks to activeProcessorCount. (3) If stream is infinite, group.waitForAll() is never reached, but the group still accumulates task overhead. Fix: use withDiscardingTaskGroup and throttle by checking active task count before addTask.",
+      "assertions": [
+        {
+          "id": "AS3.1",
+          "text": "Identifies regular TaskGroup with Void results accumulates child task metadata — recommends withDiscardingTaskGroup",
+          "discriminating": true,
+          "rationale": "withDiscardingTaskGroup is a specific Swift 5.9+ API from asyncstream-memory.md — baseline typically misses this"
+        },
+        {
+          "id": "AS3.2",
+          "text": "Identifies missing backpressure — group grows unboundedly if stream is faster than consumers",
+          "rationale": "Backpressure is a core AsyncStream concern from skill"
+        },
+        {
+          "id": "AS3.3",
+          "text": "Recommends throttling concurrent tasks to activeProcessorCount",
+          "rationale": "Skill's specific throttle recommendation for unbounded work"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "reference": "task-structured",
+      "difficulty": "simple",
+      "name": "task-structured-simple",
+      "prompt": "Will this code compile? If yes, is the isolation correct?\n\n```swift\n@MainActor\nclass HomeViewModel: ObservableObject {\n    @Published var title = \"Home\"\n\n    func refresh() {\n        Task.detached {\n            let newTitle = await self.fetchTitle()\n            self.title = newTitle  // Is this safe?\n        }\n    }\n}\n```",
+      "expected_output": "It compiles with a warning (Swift 5) or error (Swift 6). Task.detached strips the caller's @MainActor isolation — the closure runs nonisolated, so assigning self.title (a @MainActor property) from a detached task crosses isolation boundaries. Fix: use Task {} (not Task.detached) to inherit the caller's @MainActor isolation. Task.detached is almost never the right choice when called from an isolated context.",
+      "assertions": [
+        {
+          "id": "TS1.1",
+          "text": "Identifies Task.detached strips @MainActor isolation from the caller",
+          "rationale": "Task.detached vs Task {} distinction from advanced-patterns.md"
+        },
+        {
+          "id": "TS1.2",
+          "text": "Identifies self.title assignment from detached task is an isolation crossing (warning/error in Swift 6)",
+          "rationale": "Concrete consequence of stripping isolation"
+        },
+        {
+          "id": "TS1.3",
+          "text": "Recommends Task {} instead of Task.detached to inherit caller's actor",
+          "discriminating": true,
+          "rationale": "Skill rule: Task.detached is rarely correct from an isolated context — baseline often accepts detached as equivalent"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "reference": "task-structured",
+      "difficulty": "medium",
+      "name": "task-structured-medium",
+      "prompt": "Which concurrency structure should replace the placeholder? Explain the tradeoffs:\n\n```swift\nfunc loadDashboard(userID: UUID, postIDs: [UUID]) async throws -> Dashboard {\n    // A: Fixed set of parallel fetches\n    async let user = fetchUser(id: userID)\n    async let notifications = fetchNotifications(for: userID)\n\n    // B: Dynamic set — postIDs count varies at runtime\n    // ??? fetch all posts in parallel\n\n    return Dashboard(\n        user: try await user,\n        notifications: try await notifications,\n        posts: /* ??? */\n    )\n}\n```",
+      "expected_output": "Use withThrowingTaskGroup for the dynamic set (B). async let is fixed at compile time — it cannot be used in a loop or when count is unknown at compile time. TaskGroup handles dynamic counts: add one task per postID, collect results with for await. async let (A) is correct for the known pair (user + notifications) — it is simpler for heterogeneous return types and a fixed count. If postIDs could be thousands, also add throttling to cap concurrent tasks at activeProcessorCount.",
+      "assertions": [
+        {
+          "id": "TS2.1",
+          "text": "Recommends TaskGroup (withThrowingTaskGroup) for the dynamic postIDs",
+          "rationale": "TaskGroup for dynamic counts vs async let for fixed compile-time counts"
+        },
+        {
+          "id": "TS2.2",
+          "text": "Explains async let is fixed at compile time and cannot be used in a loop",
+          "discriminating": true,
+          "rationale": "Key async let limitation from advanced-patterns.md — baseline often suggests async let in loops, which is a compile error"
+        },
+        {
+          "id": "TS2.3",
+          "text": "Confirms async let is correct for the fixed pair (user + notifications)",
+          "rationale": "async let is the simplest choice for small fixed heterogeneous concurrent work"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "reference": "task-structured",
+      "difficulty": "complex",
+      "name": "task-structured-complex",
+      "prompt": "This sync function OOMs when userIDs is large. Redesign it:\n\n```swift\nfunc syncAllUsers(userIDs: [UUID]) async throws {\n    try await withThrowingTaskGroup(of: Void.self) { group in\n        for id in userIDs {  // Could be 50,000 IDs\n            group.addTask {\n                try await syncUser(id: id)  // Network + DB write, ~300ms each\n            }\n        }\n        try await group.waitForAll()\n    }\n}\n```",
+      "expected_output": "Adds 50,000 child tasks immediately — each task object is allocated before any work completes, causing OOM. Fix: throttle with a producer-consumer pattern inside the group. Add tasks up to a limit (activeProcessorCount * 2), then use group iteration to wait for one to finish before adding the next. For fire-and-forget tasks, withDiscardingTaskGroup avoids result accumulation overhead. Pattern: use a sliding window — for-loop inside the group.next() iteration to maintain a constant number of in-flight tasks.",
+      "assertions": [
+        {
+          "id": "TS3.1",
+          "text": "Identifies 50,000 tasks allocated simultaneously causes OOM before any work completes",
+          "discriminating": true,
+          "rationale": "TaskGroup OOM from upfront task allocation is explicitly in crash-patterns.md"
+        },
+        {
+          "id": "TS3.2",
+          "text": "Recommends throttling with a sliding window — add new task only after one completes",
+          "rationale": "Correct TaskGroup throttling pattern from skill"
+        },
+        {
+          "id": "TS3.3",
+          "text": "Mentions withDiscardingTaskGroup to avoid result accumulation overhead for Void tasks",
+          "discriminating": true,
+          "rationale": "withDiscardingTaskGroup is the skill-specific optimization — baseline typically only addresses task count"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "reference": "cancellation",
+      "difficulty": "simple",
+      "name": "cancellation-simple",
+      "prompt": "What's wrong with this error handling?\n\n```swift\nfunc loadContent() async {\n    do {\n        let data = try await fetchData()\n        display(data)\n    } catch {\n        showErrorAlert(error.localizedDescription)\n    }\n}\n```",
+      "expected_output": "CancellationError is surfaced to the user as an error alert. When a Task is cancelled, fetchData() throws CancellationError — the user sees a confusing 'cancelled' message. Fix: catch CancellationError separately and return silently before the generic catch. Rule: CancellationError should always be handled silently, never shown to users.",
+      "assertions": [
+        {
+          "id": "CN1.1",
+          "text": "Identifies CancellationError is caught by the generic catch and shown to user",
+          "rationale": "CancellationError must be caught silently from cancellation-patterns.md"
+        },
+        {
+          "id": "CN1.2",
+          "text": "Adds catch is CancellationError { return } before the generic catch",
+          "discriminating": true,
+          "rationale": "Skill rule: CancellationError never surfaces to users — specific pattern from cancellation-patterns.md"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "reference": "cancellation",
+      "difficulty": "medium",
+      "name": "cancellation-medium",
+      "prompt": "This Task cannot be cancelled mid-work even when the parent is cancelled. Why and how to fix it?\n\n```swift\nfunc buildSearchIndex(_ items: [ContentItem]) async throws -> SearchIndex {\n    var index = SearchIndex()\n    for item in items {  // Potentially 200,000 items\n        index.add(item)  // Pure CPU work, ~1μs each\n    }\n    return index\n}\n```",
+      "expected_output": "The loop has no cooperative cancellation check — it runs to completion even if the parent Task is cancelled. Purely synchronous CPU loops don't yield to the cooperative pool and can't be interrupted. Fix: check Task.isCancelled or call try Task.checkCancellation() periodically (e.g. every 1000 iterations). For very fast inner loops, checking every N iterations is more efficient than every iteration.",
+      "assertions": [
+        {
+          "id": "CN2.1",
+          "text": "Identifies the CPU loop has no cancellation check and will not respond to parent Task cancellation",
+          "rationale": "Cooperative cancellation requires explicit checks in synchronous loops"
+        },
+        {
+          "id": "CN2.2",
+          "text": "Recommends calling try Task.checkCancellation() or checking Task.isCancelled periodically",
+          "rationale": "Correct cooperative cancellation hook from cancellation-patterns.md"
+        },
+        {
+          "id": "CN2.3",
+          "text": "Suggests checking every N iterations rather than every iteration for performance",
+          "discriminating": true,
+          "rationale": "Skill's efficiency guidance for hot loops — baseline typically suggests checking every iteration"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "reference": "cancellation",
+      "difficulty": "complex",
+      "name": "cancellation-complex",
+      "prompt": "When this upload Task is cancelled, the server-side upload continues. Fix the resource leak:\n\n```swift\nfunc uploadFile(_ url: URL) async throws -> UploadResult {\n    let uploadID = try await startUpload(url: url)\n    while true {\n        let status = try await pollUploadStatus(id: uploadID)\n        if status.isComplete { return status.result! }\n        try await Task.sleep(for: .seconds(2))\n    }\n}\n```",
+      "expected_output": "When the Task is cancelled, Task.sleep throws CancellationError and the function exits — but the server-side upload keeps running under uploadID. Fix: wrap the polling loop in withTaskCancellationHandler { cancelUpload(id: uploadID) } to call a cleanup function when the Task is cancelled. The cancellation handler must be synchronous (non-async) and may be called from any thread — schedule async cleanup via an unstructured Task if needed.",
+      "assertions": [
+        {
+          "id": "CN3.1",
+          "text": "Identifies Task cancellation exits the client but leaves server-side upload running — resource leak",
+          "rationale": "External resource cleanup on cancellation from cancellation-patterns.md"
+        },
+        {
+          "id": "CN3.2",
+          "text": "Recommends withTaskCancellationHandler to trigger cancelUpload when the Task is cancelled",
+          "discriminating": true,
+          "rationale": "withTaskCancellationHandler is the specific API from skill — baseline may suggest try-catch which misses proactive cleanup"
+        },
+        {
+          "id": "CN3.3",
+          "text": "Notes the cancellation handler must be synchronous and may be called from any thread",
+          "discriminating": true,
+          "rationale": "Cancellation handler threading constraint from cancellation-patterns.md — baseline rarely covers this"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "reference": "migration",
+      "difficulty": "simple",
+      "name": "migration-simple",
+      "prompt": "How do I start migrating an existing multi-target iOS project to Swift 6 strict concurrency without breaking everything at once?",
+      "expected_output": "Two-phase approach: (1) First set SWIFT_STRICT_CONCURRENCY=complete in build settings — this enables all concurrency warnings but does NOT enforce them as errors. This is different from Swift 6 language mode. Fix warnings module-by-module before switching to Swift 6 mode. (2) Migrate bottom-up: start with leaf modules (no internal dependencies), then work toward the app target. One module per PR. Run Thread Sanitizer in CI throughout to catch runtime races the compiler misses.",
+      "assertions": [
+        {
+          "id": "MI1.1",
+          "text": "Distinguishes SWIFT_STRICT_CONCURRENCY=complete (warnings) from Swift 6 language mode (errors)",
+          "discriminating": true,
+          "rationale": "This distinction is commonly confused — skill specifically prescribes complete as the first step"
+        },
+        {
+          "id": "MI1.2",
+          "text": "Recommends bottom-up migration starting with leaf modules",
+          "rationale": "Core migration strategy from migration-strategy.md"
+        },
+        {
+          "id": "MI1.3",
+          "text": "Recommends running Thread Sanitizer in CI throughout the migration",
+          "rationale": "TSan catches runtime races compiler misses"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "reference": "migration",
+      "difficulty": "medium",
+      "name": "migration-medium",
+      "prompt": "Enabling SWIFT_STRICT_CONCURRENCY=complete gives these errors on global state. How should each be fixed?\n\n```swift\n// AppGlobals.swift\nvar currentTheme: AppTheme = .light         // Error: not concurrency-safe\nvar featureFlags: [String: Bool] = [:]     // Error: not concurrency-safe\nlet appVersion: String = \"2.1.0\"           // ?\n```",
+      "expected_output": "Global var with mutable value types is not concurrency-safe under strict concurrency. Three cases: (1) currentTheme: add @MainActor if used only on main thread (UI state), or wrap in an actor for broader access. (2) featureFlags: dictionary mutation is not safe globally — wrap in an actor or use Mutex<[String: Bool]> for synchronous access. (3) appVersion: let constant is already safe — no change needed. Never use nonisolated(unsafe) without documented synchronization guarantees.",
+      "assertions": [
+        {
+          "id": "MI2.1",
+          "text": "Identifies global var causes strict concurrency error (not concurrency-safe)",
+          "rationale": "Global mutable state migration from migration-strategy.md"
+        },
+        {
+          "id": "MI2.2",
+          "text": "Recommends @MainActor for UI-related global state (currentTheme)",
+          "rationale": "Correct isolation for UI-only global state"
+        },
+        {
+          "id": "MI2.3",
+          "text": "Recommends actor or Mutex for featureFlags (shared read-write dictionary)",
+          "discriminating": true,
+          "rationale": "Skill decision tree: Mutex for sync access vs actor for async — baseline often only suggests actor"
+        },
+        {
+          "id": "MI2.4",
+          "text": "Correctly identifies let constant (appVersion) is already safe — no change needed",
+          "rationale": "Discriminating: knows let globals are fine, doesn't over-engineer"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "reference": "migration",
+      "difficulty": "complex",
+      "name": "migration-complex",
+      "prompt": "Enabling strict concurrency on our analytics module gives 47 errors because OldAnalyticsSDK types are not Sendable. How should we handle this?\n\n```swift\nimport OldAnalyticsSDK  // OldSDK.Tracker is not Sendable\n\nclass AnalyticsManager {\n    let tracker = OldSDK.Tracker.shared\n\n    func logEvent(_ event: String) async {\n        tracker.log(event)  // Error: sending non-Sendable value\n    }\n}\n```",
+      "expected_output": "Two strategies for third-party non-Sendable blockers: (1) Short-term: use @preconcurrency import OldAnalyticsSDK to downgrade errors to warnings — allows migration to proceed without immediately fixing the third-party blocker. (2) Long-term: wrap OldSDK.Tracker in a dedicated actor that owns the instance and mediates all access. All callers go through the actor — the non-Sendable type never crosses isolation boundaries directly. Never use @unchecked Sendable on the wrapper.",
+      "assertions": [
+        {
+          "id": "MI3.1",
+          "text": "Recommends wrapping the third-party non-Sendable type in a dedicated actor",
+          "discriminating": true,
+          "rationale": "Actor wrapper for third-party blockers is the skill's prescribed pattern from migration-strategy.md"
+        },
+        {
+          "id": "MI3.2",
+          "text": "Recommends @preconcurrency import as a short-term escape hatch to downgrade errors to warnings",
+          "discriminating": true,
+          "rationale": "@preconcurrency import is a Swift-specific migration tool from migration-strategy.md — rarely known without skill"
+        },
+        {
+          "id": "MI3.3",
+          "text": "States the non-Sendable instance must never cross isolation boundaries directly — all access through the actor",
+          "rationale": "Core containment requirement for non-Sendable third-party types"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "reference": "security-concurrency",
+      "difficulty": "simple",
+      "name": "security-concurrency-simple",
+      "prompt": "Identify the security bug in this actor:\n\n```swift\nactor AuthManager {\n    var token: String?\n\n    func performSecureAction() async throws {\n        guard token != nil else { throw AuthError.unauthorized }\n        try await apiCall()  // Network request\n        useToken(token!)    // Is this safe?\n    }\n}\n```",
+      "expected_output": "TOCTOU (Time-of-Check/Time-of-Use) at the suspension point. token is checked before await apiCall(), but actor reentrancy allows another caller to modify or nil out token during the suspension. By the time useToken(token!) executes, token may be nil — causing a crash — or may hold a different (expired) value. Fix: capture the token before the suspension point: guard let token else { throw ... }; then use the captured token after the await.",
+      "assertions": [
+        {
+          "id": "SC1.1",
+          "text": "Identifies TOCTOU at the await suspension point — token checked before await, may change after",
+          "discriminating": true,
+          "rationale": "TOCTOU at await is a key security pattern from security-concurrency.md — baseline may only note the force-unwrap crash"
+        },
+        {
+          "id": "SC1.2",
+          "text": "Explains actor reentrancy allows state mutation during the suspension",
+          "rationale": "Reentrancy is the mechanism enabling the TOCTOU"
+        },
+        {
+          "id": "SC1.3",
+          "text": "Recommends capturing the token before the suspension point (guard let token = token else { throw })",
+          "rationale": "Correct fix: snapshot state before any await"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "reference": "security-concurrency",
+      "difficulty": "medium",
+      "name": "security-concurrency-medium",
+      "prompt": "This token refresh causes cascading 401 errors in production under concurrent load:\n\n```swift\nactor APIClient {\n    var accessToken: String\n    var isRefreshing = false\n\n    func makeRequest(_ endpoint: String) async throws -> Data {\n        if accessToken.isExpired {\n            if !isRefreshing {\n                isRefreshing = true\n                accessToken = try await refreshToken()  // Suspension\n                isRefreshing = false\n            }\n        }\n        return try await fetch(endpoint, token: accessToken)\n    }\n}\n```",
+      "expected_output": "Actor reentrancy token refresh race: After await refreshToken(), isRefreshing is true — but multiple concurrent callers entered makeRequest() before the first refresh completed. Each sees isExpired=true and isRefreshing=false (their snapshot before the first suspension), so each starts a separate refresh. Result: N parallel token refreshes, N token invalidations, cascading 401s. Fix: use Task coalescing — store a Task<String, Error>? for in-flight refresh; new callers await the existing task's value instead of starting a new refresh. Check isRefreshing only after await to handle concurrent entries.",
+      "assertions": [
+        {
+          "id": "SC2.1",
+          "text": "Identifies actor reentrancy causes multiple concurrent callers to each start a refresh",
+          "discriminating": true,
+          "rationale": "Token refresh race is the canonical security-concurrency.md example — requires understanding reentrancy at suspension points"
+        },
+        {
+          "id": "SC2.2",
+          "text": "Explains the race: callers check isRefreshing before the first suspension, so all see false",
+          "rationale": "Tracing the reentrancy flow through the specific code"
+        },
+        {
+          "id": "SC2.3",
+          "text": "Recommends Task coalescing — single in-flight Task<String, Error>? that all callers await",
+          "discriminating": true,
+          "rationale": "Specific coalescing pattern from security-concurrency.md — isRefreshing flag alone is insufficient"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "reference": "security-concurrency",
+      "difficulty": "complex",
+      "name": "security-concurrency-complex",
+      "prompt": "Audit this biometric authentication flow for concurrency security issues:\n\n```swift\nclass BiometricAuthManager {\n    func authenticateAndFetch() async throws -> UserCredentials {\n        let context = LAContext()\n        let success = try await withCheckedThrowingContinuation { continuation in\n            context.evaluatePolicy(\n                .deviceOwnerAuthenticationWithBiometrics,\n                localizedReason: \"Authenticate\"\n            ) { success, error in\n                if let error {\n                    continuation.resume(throwing: error); return\n                }\n                continuation.resume(returning: success)\n            }\n        }\n        guard success else { throw AuthError.failed }\n\n        let credentials = try KeychainManager.read(key: \"userCredentials\")\n\n        Task.detached {\n            await AnalyticsManager.shared.logAuthSuccess(credentials.userID)\n        }\n\n        return credentials\n    }\n}\n```",
+      "expected_output": "Three security issues: (1) Task.detached captures the full credentials object — sensitive data escapes into an unstructured task with unknown lifetime. If the detached task is delayed, credentials may persist in memory longer than needed. Log only credentials.userID (non-sensitive) and avoid capturing the full struct. (2) If the parent Task is cancelled between Keychain read and return, credentials are captured in the detached task with no cleanup path. Use Task {} (structured) to tie the analytics call to the parent's lifetime. (3) The LAContext evaluatePolicy callback has no cancellation path — if the parent Task is cancelled during biometric prompt, the continuation is not resumed, causing a permanent hang. Add a withTaskCancellationHandler to call context.invalidate() and resume the continuation with an error.",
+      "assertions": [
+        {
+          "id": "SC3.1",
+          "text": "Identifies Task.detached captures full sensitive credentials — sensitive data escapes unstructured Task",
+          "discriminating": true,
+          "rationale": "Sensitive data + Task.detached capture is a security-concurrency.md pattern — baseline may miss the sensitivity angle"
+        },
+        {
+          "id": "SC3.2",
+          "text": "Recommends logging only non-sensitive fields (userID) and using Task {} instead of Task.detached",
+          "rationale": "Minimize sensitive data exposure in unstructured concurrency"
+        },
+        {
+          "id": "SC3.3",
+          "text": "Identifies LAContext evaluatePolicy has no cancellation path — parent Task cancellation causes continuation hang",
+          "discriminating": true,
+          "rationale": "Missing cancellation path for biometric continuation is a subtle hang from security-concurrency.md + cancellation-patterns.md"
+        },
+        {
+          "id": "SC3.4",
+          "text": "Recommends withTaskCancellationHandler to call context.invalidate() and resume the continuation with an error on cancellation",
+          "discriminating": true,
+          "rationale": "Specific fix combining withTaskCancellationHandler + continuation cancellation — requires skill knowledge"
+        }
+      ]
+    }
+  ]
+}

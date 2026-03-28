@@ -1,0 +1,298 @@
+{
+  "skill_name": "viper-uikit-architecture",
+  "evals": [
+    {
+      "id": 1,
+      "name": "product-list-module",
+      "prompt": "Create a VIPER module for a product list screen. The screen should fetch products from an API, show loading/error/empty states, display products in a table view, and let users tap a product to navigate to a detail screen. Use proper VIPER patterns with protocol contracts, module builder, and correct memory management.",
+      "expected_output": "A complete VIPER module with Contract (6 protocols), passive ViewController, UIKit-free Presenter with ViewState mapping, Interactor with injected service, Router with weak VC reference, and enum-based Builder that wires everything correctly.",
+      "files": [],
+      "assertions": [
+        "Defines module contract with separate protocols for each VIPER boundary (at least ViewInput, PresenterInput, InteractorInput, InteractorOutput, RouterInput)",
+        "All protocols used for weak references are constrained to AnyObject",
+        "Presenter does NOT import UIKit \u2014 only Foundation",
+        "View (ViewController) is passive: forwards viewDidLoad to Presenter, renders ViewState, does not make content decisions",
+        "Interactor receives service dependency via constructor injection (protocol type, not concrete)",
+        "Interactor uses [weak self] in async callbacks",
+        "Presenter holds weak reference to View",
+        "Interactor holds weak reference to Presenter (output)",
+        "Router holds weak reference to ViewController",
+        "Uses ViewState enum (loading/loaded/empty/error) \u2014 not separate boolean flags",
+        "Presenter maps domain data to ViewModels before passing to View",
+        "Builder/Module factory creates all components and wires references before returning VC",
+        "Router navigates to detail screen by creating the destination module via its Builder",
+        "View protocol methods are at a higher abstraction than UIKit widgets \u2014 e.g. `display(_ viewModel:)` not `tableView.reloadData()` or `setLabelText(_:)`",
+        "Product entities are defined OUTSIDE the module folder \u2014 in a shared domain layer, not inside the module directory",
+        "Builder is enum-based (not a class) to prevent accidental instantiation",
+        "Router's viewController property is typed as `UIViewController?` (weak optional) \u2014 not the concrete ViewController subclass"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "profile-refactor",
+      "prompt": "I have a massive 900-line UIViewController that handles a user profile screen. It does networking directly (URLSession), formats dates and currencies, manages navigation (pushes to settings, presents image picker), and has inline UITableView data source logic. Help me refactor this into proper VIPER architecture. Here's a simplified version of the current code:\n\nclass ProfileViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UIImagePickerControllerDelegate {\n    var userId: String!\n    var user: User?\n    var posts: [Post] = []\n    var isLoading = false\n    var error: String?\n    \n    override func viewDidLoad() {\n        super.viewDidLoad()\n        fetchProfile()\n    }\n    \n    func fetchProfile() {\n        isLoading = true\n        tableView.reloadData()\n        URLSession.shared.dataTask(with: URL(string: \"https://api.example.com/users/\\(userId!)\")!) { [weak self] data, _, error in\n            DispatchQueue.main.async {\n                self?.isLoading = false\n                if let data = data, let user = try? JSONDecoder().decode(User.self, from: data) {\n                    self?.user = user\n                    self?.title = user.name\n                    self?.tableView.reloadData()\n                } else {\n                    self?.error = error?.localizedDescription ?? \"Failed\"\n                    self?.tableView.reloadData()\n                }\n            }\n        }.resume()\n    }\n    \n    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {\n        if indexPath.section == 1 {\n            let vc = PostDetailViewController()\n            vc.post = posts[indexPath.row]\n            navigationController?.pushViewController(vc, animated: true)\n        }\n    }\n    \n    @objc func settingsTapped() {\n        let settingsVC = SettingsViewController()\n        settingsVC.user = user\n        navigationController?.pushViewController(settingsVC, animated: true)\n    }\n    \n    @objc func changeAvatarTapped() {\n        let picker = UIImagePickerController()\n        picker.delegate = self\n        present(picker, animated: true)\n    }\n}",
+      "expected_output": "A refactored VIPER module with: networking extracted to a service protocol injected into Interactor, business logic in Interactor, date/currency formatting in Presenter, passive VC that only renders and forwards events, Router handling all navigation, and a Builder wiring everything with correct weak references.",
+      "files": [],
+      "assertions": [
+        "Creates a contract file with protocols for all VIPER boundaries",
+        "Presenter does NOT import UIKit",
+        "URLSession networking extracted to a separate service protocol (e.g. ProfileServiceProtocol) injected into Interactor",
+        "Interactor accesses userId without force-unwrapping \u2014 passed via constructor, configured property, or method parameter (not var userId: String!)",
+        "View only forwards user actions to Presenter (didTapSettings, didSelectPost, didTapChangeAvatar)",
+        "Presenter maps User entity to a display-ready ViewModel (formatted dates, etc.)",
+        "Router handles ALL navigation: push to settings, push to post detail, present image picker",
+        "Router does NOT create VCs with force-unwrapped or directly set properties \u2014 uses Builder pattern for destinations",
+        "Uses ViewState enum instead of separate isLoading/error/user booleans",
+        "All back-references are weak (Presenter\u2192View, Interactor\u2192Output, Router\u2192VC)",
+        "Presenter decides which ViewState to show based on Interactor results",
+        "Presenter does NOT set `view?.title = user.name` or any UINavigationItem property directly \u2014 title is part of the ViewModel passed via the View protocol",
+        "User and Post entities defined outside the module folder in a shared domain layer"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "presenter-tests",
+      "prompt": "Write comprehensive unit tests for a VIPER Presenter that handles an order checkout flow. The Presenter should: show loading when checkout starts, call the Interactor to validate the order, show error if validation fails, call the Interactor to process payment on validation success, navigate to confirmation on payment success, and show error on payment failure. Include tests for the full communication chain and memory leak detection.",
+      "expected_output": "Complete test suite with mock View, mock Interactor, mock Router. Tests cover: loading state shown, Interactor methods called, error mapping, navigation on success, and memory leak detection via weak reference assertions.",
+      "files": [],
+      "assertions": [
+        "Creates mock objects for View, Interactor, and Router protocols with call tracking (callCount, receivedArgs)",
+        "Tests the full chain: user action \u2192 Presenter \u2192 Interactor call \u2192 Interactor output \u2192 Presenter \u2192 View update",
+        "Tests loading state is shown when checkout begins",
+        "Tests validation failure maps to user-friendly error message on View",
+        "Tests successful validation triggers payment processing on Interactor",
+        "Tests successful payment triggers Router navigation to confirmation",
+        "Tests payment failure shows error on View",
+        "Includes memory leak detection using weak reference and XCTAssertNil in addTeardownBlock",
+        "Uses setUp/tearDown or makeSUT factory to create and manage SUT and mocks lifecycle",
+        "Mock View protocol is constrained to AnyObject (since Presenter holds weak reference)",
+        "Mock Interactor call tracking uses named properties like `validateOrderCallCount` or `receivedOrderId` \u2014 not just booleans",
+        "Router test scenario creates a strong reference to ViewController in the test to prevent premature deallocation via Router's weak ref"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "module-communication",
+      "prompt": "I have an OrderListModule that shows a list of orders. When the user taps an order, it navigates to OrderDetailModule. In the detail screen, the user can delete the order. After deletion, the list should refresh. Also, the detail screen has a button to open an ItemPickerModule (presented modally) that lets the user add an item to the order \u2014 when an item is picked, both the detail and the list should update.\n\nImplement the inter-module communication using VIPER delegate patterns. Show the protocols, how each module's Presenter/Router connects, and how data flows back from child to parent modules.",
+      "expected_output": "Three VIPER modules with delegate protocols for backward communication. OrderDetail reports deletion via delegate to OrderList. ItemPicker reports selection via delegate. Delegates are wired through Routers during module creation.",
+      "files": [],
+      "assertions": [
+        "Defines a ModuleOutput or delegate protocol for OrderDetailModule that notifies parent of deletion",
+        "Defines a ModuleOutput or delegate protocol for ItemPickerModule that returns the selected item",
+        "Delegate protocols are AnyObject-constrained for weak references",
+        "OrderList Presenter (or its delegate adapter) conforms to OrderDetail's ModuleOutput",
+        "Delegate is passed through Router \u2192 Builder as a parameter when creating child modules",
+        "ItemPicker dismissal is handled by the PRESENTING module's Router, not by ItemPicker itself",
+        "OrderList refreshes data when notified of deletion or item addition via delegate callback",
+        "Child module Builder accepts delegate as a parameter \u2014 NOT set as a property after build() returns",
+        "OrderList Presenter conforms to the delegate protocol \u2014 NOT OrderList's Router"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "code-review-antipatterns",
+      "prompt": "Review this VIPER module code and identify all architecture violations and anti-patterns. Fix each one.\n\n```swift\nimport UIKit\n\n// MARK: - Presenter\nclass DashboardPresenter {\n    var view: DashboardViewController!\n    var interactor: DashboardInteractor!\n    var router: DashboardRouter!\n    \n    func viewDidLoad() {\n        let items = interactor.fetchItemsSync()\n        let filtered = items.filter { $0.isActive && $0.createdDate > Calendar.current.date(byAdding: .day, value: -7, to: Date())! }\n        let sorted = filtered.sorted { $0.priority > $1.priority }\n        for item in sorted {\n            let cell = UITableViewCell()\n            cell.textLabel?.text = item.name\n            cell.detailTextLabel?.text = \"$\\(item.price)\"\n        }\n        view.items = sorted\n        view.tableView.reloadData()\n    }\n    \n    func didTapItem(_ item: Item) {\n        let detailVC = ItemDetailViewController()\n        detailVC.item = item\n        view.navigationController?.pushViewController(detailVC, animated: true)\n    }\n}\n\n// MARK: - Interactor\nclass DashboardInteractor {\n    var presenter: DashboardPresenter!\n    \n    func fetchItemsSync() -> [Item] {\n        let url = URL(string: \"https://api.example.com/items\")!\n        let data = try! Data(contentsOf: url)\n        return try! JSONDecoder().decode([Item].self, from: data)\n    }\n}\n\n// MARK: - Router\nclass DashboardRouter {\n    var presenter: DashboardPresenter!\n    var viewController: DashboardViewController!\n}\n```",
+      "expected_output": "Identifies at least 9 anti-patterns including the Router holding a Presenter reference. Provides corrected code with protocols, weak references, AnyObject constraints, navigation moved to Router, and business logic moved to Interactor.",
+      "files": [],
+      "assertions": [
+        "Identifies that Presenter imports UIKit \u2014 fixes by removing UIKit import and using Foundation only",
+        "Identifies that all references use concrete types instead of protocols \u2014 introduces protocol contracts",
+        "Identifies strong back-references (Interactor\u2192Presenter, Presenter\u2192View) \u2014 fixes with weak references",
+        "Identifies business logic in Presenter (filtering, sorting) \u2014 moves to Interactor",
+        "Identifies synchronous blocking network call \u2014 replaces with async pattern",
+        "Identifies navigation happening directly in Presenter \u2014 moves to Router",
+        "Identifies Router holding strong reference to ViewController \u2014 fixes with weak",
+        "Identifies missing AnyObject constraints on protocols used for weak references",
+        "Identifies that DashboardRouter holds `var presenter: DashboardPresenter!` \u2014 Router should ONLY reference ViewController, never Presenter; this creates an additional retain cycle",
+        "Fixed Router implements the RouterInput protocol with actual navigation methods (e.g. `func navigateToItemDetail(item:)`) \u2014 not just an empty class with properties",
+        "All implicitly-unwrapped optionals (`var x: Type!`) on back-references converted to `weak var x: ProtocolType?`"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "async-await-integration",
+      "prompt": "Build a VIPER module for a chat feature that uses async/await and AsyncStream. The module should:\n1. Fetch initial messages from an API on viewDidLoad\n2. Subscribe to a WebSocket-like message stream (AsyncStream) for real-time updates\n3. Cancel the stream subscription when the module is dismissed\n4. Handle errors from both the initial fetch and the stream\n5. Use @MainActor where appropriate\n\nShow how async/await changes the traditional VIPER callback pattern (specifically: does the Interactor still need an Output protocol?).",
+      "expected_output": "A VIPER module where async/await replaces the InteractorOutput callback protocol. Presenter is @MainActor, Interactor methods return values directly via async throws. AsyncStream for real-time messages with proper Task cancellation in deinit.",
+      "files": [],
+      "assertions": [
+        "Presenter is annotated with @MainActor",
+        "Interactor fetch method uses async throws return type \u2014 Presenter awaits results directly (e.g. `let messages = try await interactor.fetchMessages()`) rather than receiving them via a callback",
+        "Uses AsyncStream or AsyncSequence for the real-time message subscription",
+        "Task is stored as a named property (e.g. `private var streamTask: Task<Void, Never>?`) and explicitly cancelled with `.cancel()` in deinit or viewWillDisappear to prevent leaks",
+        "Stream consumption loop includes `try Task.checkCancellation()` OR `guard !Task.isCancelled else { break }` before processing each message",
+        "Interactor does NOT have @MainActor \u2014 business logic runs off main thread",
+        "Error handling covers both initial fetch failure and stream failure separately",
+        "Presenter awaits Interactor methods directly \u2014 when async/await is used throughout, a callback-based InteractorOutput protocol is not needed",
+        "When the Task is cancelled, the AsyncStream producer is also cleaned up (e.g. via onTermination handler on the stream continuation)"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "retain-cycle-detection",
+      "prompt": "This VIPER module has a memory leak \u2014 it never deallocates when dismissed. Find the retain cycle(s), explain the ownership chain that causes the leak, and fix it. Add deinit logging to verify.\n\n```swift\nprotocol SettingsViewProtocol {\n    func showSettings(_ viewModel: SettingsViewModel)\n    func showError(_ message: String)\n}\n\nprotocol SettingsInteractorOutputProtocol {\n    func didFetchSettings(_ settings: Settings)\n    func didFailToFetchSettings(_ error: Error)\n}\n\nclass SettingsViewController: UIViewController, SettingsViewProtocol {\n    var presenter: SettingsPresenter!\n    \n    override func viewDidLoad() {\n        super.viewDidLoad()\n        presenter.viewDidLoad()\n    }\n    \n    func showSettings(_ viewModel: SettingsViewModel) { /* update UI */ }\n    func showError(_ message: String) { /* show alert */ }\n}\n\nclass SettingsPresenter: SettingsInteractorOutputProtocol {\n    var view: SettingsViewProtocol!\n    var interactor: SettingsInteractor!\n    var router: SettingsRouter!\n    \n    func viewDidLoad() {\n        interactor.fetchSettings()\n    }\n    \n    func didFetchSettings(_ settings: Settings) {\n        let vm = SettingsViewModel(settings)\n        view.showSettings(vm)\n    }\n    func didFailToFetchSettings(_ error: Error) {\n        view.showError(error.localizedDescription)\n    }\n}\n\nclass SettingsInteractor {\n    var presenter: SettingsInteractorOutputProtocol!\n    let settingsService: SettingsServiceProtocol\n    \n    init(settingsService: SettingsServiceProtocol) {\n        self.settingsService = settingsService\n    }\n    \n    func fetchSettings() {\n        settingsService.getSettings { [weak self] result in\n            switch result {\n            case .success(let settings): self?.presenter.didFetchSettings(settings)\n            case .failure(let error): self?.presenter.didFailToFetchSettings(error)\n            }\n        }\n    }\n}\n\nclass SettingsRouter {\n    var viewController: SettingsViewController!\n}\n```",
+      "expected_output": "Identifies 3 retain cycles: (1) View\u2192Presenter\u2192View (both strong), (2) Presenter\u2192Interactor\u2192Presenter (both strong), (3) Router\u2192VC (strong). Protocols missing AnyObject constraint prevents using weak. Fixes all with weak references and AnyObject constraints.",
+      "files": [],
+      "assertions": [
+        "Identifies that Presenter\u2192View is strong (var view: SettingsViewProtocol!) and should be weak",
+        "Identifies that Interactor\u2192Presenter is strong (var presenter: SettingsInteractorOutputProtocol!) and should be weak",
+        "Identifies that Router\u2192VC is strong (var viewController: SettingsViewController!) and should be weak",
+        "Identifies that protocols LACK AnyObject constraint \u2014 this is the ROOT CAUSE preventing weak references (not just a side effect)",
+        "Adds AnyObject constraint to SettingsViewProtocol and SettingsInteractorOutputProtocol",
+        "Changes Presenter's view reference to weak var",
+        "Changes Interactor's presenter reference to weak var",
+        "Changes Router's viewController reference to weak var",
+        "Adds deinit with print/logging to ALL VIPER components (View, Presenter, Interactor, Router) \u2014 not just two",
+        "Explains that after fixes, ALL three cycles are broken: View owns Presenter (strong unchanged), but Presenter\u2192View is weak; Presenter owns Interactor (strong unchanged), but Interactor\u2192Presenter is weak; Router\u2192VC is weak"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "swiftui-migration",
+      "prompt": "I have an existing VIPER module (OrderListModule) with a UIKit ViewController, Presenter, Interactor, Router, and Builder. I want to replace ONLY the View layer with SwiftUI while keeping everything else (Presenter, Interactor, Router, Builder) unchanged. The existing Presenter conforms to OrderListPresenterInput and calls OrderListViewInput methods on the View.\n\nShow me how to create a SwiftUI View + ObservableObject adapter that bridges the VIPER ViewInput protocol to SwiftUI's reactive system. The Router should still use UINavigationController for navigation (push/present).",
+      "expected_output": "An ObservableObject adapter conforming to OrderListViewInput that bridges VIPER callbacks to @Published properties. A SwiftUI View using @ObservedObject. UIHostingController wraps the SwiftUI view. Router and Builder updated to use UIHostingController. No NavigationLink \u2014 UIKit navigation only.",
+      "files": [],
+      "assertions": [
+        "Creates an ObservableObject adapter class that conforms to the VIPER ViewInput protocol",
+        "Adapter uses @Published properties to drive SwiftUI View reactivity",
+        "SwiftUI View references the adapter via @ObservedObject or @StateObject",
+        "UIHostingController wraps the SwiftUI View for UIKit navigation compatibility",
+        "Builder/Module factory updated to create UIHostingController instead of UIViewController subclass",
+        "Router's weak viewController reference updated to handle UIHostingController",
+        "Does NOT use NavigationLink or NavigationStack inside the SwiftUI View \u2014 navigation stays in Router via UIKit",
+        "Existing Interactor code requires ZERO changes for the migration",
+        "Presenter's `view` property type remains the VIPER ViewInput protocol (e.g. `weak var view: OrderListViewInput?`) \u2014 NOT UIHostingController or the ObservableObject adapter class directly",
+        "ObservableObject adapter ensures main-thread safety \u2014 either via @MainActor annotation on the class OR by wrapping @Published mutations in DispatchQueue.main.async",
+        "Presenter requires ZERO changes \u2014 it continues to call `view?.display(viewModel:)` as before; only the adapter class is new"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "complex-navigation",
+      "prompt": "Build VIPER Router patterns for these three navigation scenarios in a single app:\n\n1. A TabBarController with 3 tabs, each tab having its own NavigationController and VIPER module\n2. Tab 1 (Feed) pushes to a detail screen, which presents a modal comment composer. After posting a comment, both the detail and feed list should refresh.\n3. Tab 2 (Search) has a multi-step filter flow: SearchResults \u2192 FilterStep1 \u2192 FilterStep2 \u2192 FilterStep3, where the user can go back to any step. When filters are applied, SearchResults refreshes.\n\nShow the Router code, how each Router references its VC, and how the filter results propagate back.",
+      "expected_output": "Multiple Router implementations handling TabBar, push, modal, and multi-step flows. Delegate protocols for backward communication. Each Router holds weak VC reference. Filter state passed forward and results communicated back via delegate chain.",
+      "files": [],
+      "assertions": [
+        "Each tab's VIPER module has its own Router with a weak reference to its ViewController",
+        "TabBar setup does NOT live inside a single VIPER module \u2014 it's a separate coordinator, AppDelegate, or SceneDelegate factory",
+        "Each tab's NavigationController is created OUTSIDE any VIPER module \u2014 by the app-level setup code",
+        "Modal comment composer dismissal is handled by the PRESENTING Router (Feed Detail's Router), not by the composer itself",
+        "Comment posting triggers a delegate callback that reaches both FeedDetail and FeedList for refresh",
+        "Filter flow uses forward data passing (filter criteria passed through Router \u2192 Builder \u2192 Presenter)",
+        "Filter results propagate back to SearchResults via delegate protocol \u2014 NOT NotificationCenter or shared singleton",
+        "All Router\u2192ViewController references are weak",
+        "FeedDetail Router (the presenting Router) calls `viewController?.dismiss(animated: true)` AFTER receiving delegate callback \u2014 the CommentComposer module never calls dismiss on itself"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "interactor-tests",
+      "prompt": "Write unit tests for a VIPER Interactor that handles a shopping cart. The CartInteractor should:\n1. Add items to cart (with quantity validation \u2014 max 10 per item)\n2. Remove items from cart\n3. Calculate total price (subtotal + tax at 8.875%)\n4. Apply discount codes (valid codes give 10% off, invalid codes produce an error)\n5. Persist cart state via an injected CartStorageProtocol\n\nThe Interactor depends on CartStorageProtocol and DiscountServiceProtocol, both injected via constructor. Write tests with proper mocks for all dependencies.",
+      "expected_output": "Test suite with mock CartStorage and mock DiscountService. Tests cover: add/remove items, quantity limits, price calculation, discount code application (valid/invalid), and persistence calls. All dependencies mocked via protocols.",
+      "files": [],
+      "assertions": [
+        "Creates mock implementations for CartStorageProtocol and DiscountServiceProtocol with call tracking",
+        "Tests that adding an item increases the cart item count",
+        "Tests quantity validation rejects adding more than 10 of the same item",
+        "Tests removing an item decreases cart count",
+        "Tests total calculation includes subtotal + tax (8.875%)",
+        "Tests valid discount code applies 10% reduction to total",
+        "Tests invalid discount code produces an error via the Interactor's output",
+        "Interactor output (presenter mock) verifies correct callbacks for success and error cases",
+        "Interactor is instantiated directly with mock dependencies via constructor injection \u2014 NOT via Builder or Module.build()",
+        "Tax calculation test verifies correct tax amount (8.875%) \u2014 either via XCTAssertEqual with accuracy: for Double, or exact comparison for Decimal types",
+        "Tests verify CartStorage.save() is called with the correct updated cart state after adding/removing items",
+        "Presenter mock is held weakly \u2014 test includes memory leak detection via addTeardownBlock { [weak mockPresenter] in XCTAssertNil(mockPresenter) }"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "builder-assembly-tabbar",
+      "prompt": "Create a VIPER module for a HomeViewController that will be the root of the first tab in a UITabBarController. The Presenter needs to call `view?.showWelcomeMessage(username:)` as part of the initial setup when the module loads. Write the Builder code. What timing issue can occur with UITabBarController, and how does your Builder avoid it?",
+      "expected_output": "Builder wires all VIPER references before returning VC. Identifies that UITabBarController calls viewDidLoad on tab children before their init finishes, causing Presenter to be nil when forwarded. Solves by wiring Presenter in Builder before returning VC, not relying on viewDidLoad.",
+      "files": [],
+      "assertions": [
+        "Identifies that UITabBarController calls viewDidLoad on tab children before their init completes \u2014 meaning if Presenter is set in viewDidLoad, it may be nil when the VC first appears as a tab",
+        "Builder wires ALL references (Presenter\u2192View, Interactor\u2192Output, Router\u2192VC) AND calls the initial setup before returning ViewController",
+        "Builder is enum-based with a static build() method \u2014 not a class that gets instantiated",
+        "Builder's build() method accepts external dependencies as parameters \u2014 not stored as Builder properties",
+        "ViewController does NOT assign `self.presenter` in its own viewDidLoad \u2014 the Builder does it before returning",
+        "Router's viewController property is typed as `UIViewController?` \u2014 not the concrete HomeViewController subclass"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "thread-safety-dispatching",
+      "prompt": "Show the correct threading pattern for a VIPER module where the Interactor makes URLSession network calls on a background thread. Where exactly should DispatchQueue.main.async (or @MainActor) be placed in the VIPER chain to guarantee that all View updates are thread-safe? Show a concrete example with the correct placement, and explain why other placements are wrong.",
+      "expected_output": "DispatchQueue.main.async at the Interactor output boundary (before calling Presenter callback methods), OR Presenter is @MainActor and Interactor uses await MainActor.run {}. Explains Presenter must never call DispatchQueue.main.async \u2014 it assumes it's on main thread.",
+      "files": [],
+      "assertions": [
+        "DispatchQueue.main.async or @MainActor is applied at the Interactor OUTPUT boundary \u2014 just before calling Presenter callback methods (e.g. `self?.presenter?.didLoad(data)`) \u2014 not inside the Presenter before calling View",
+        "Presenter does NOT contain DispatchQueue.main.async calls \u2014 Presenter assumes it's already on the main thread",
+        "Explains that placing DispatchQueue.main.async in Presenter (before calling view methods) is wrong because Interactor callbacks may themselves do work that assumes main thread",
+        "Alternative: if Presenter is marked @MainActor, Interactor can use `Task { @MainActor in await presenter?.didLoad(data) }` \u2014 this is equivalent and acceptable",
+        "View protocol callback methods are always called on main thread \u2014 this is enforced at ONE consistent boundary in the chain, not scattered throughout"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "viewstate-enum-design",
+      "prompt": "Implement a VIPER Presenter for a social feed with these states: initial loading \u2192 content loaded (possibly empty) \u2192 loading more items (pagination, showing existing data) \u2192 error with retry \u2192 pull-to-refresh (loading fresh data). Show the ViewState enum definition and the Presenter's state transition logic. The user can trigger pull-to-refresh at any time, including while paginating.",
+      "expected_output": "ViewState enum with associated values covering all states. Presenter transitions between states cleanly. No separate boolean flags. Pull-to-refresh while paginating goes back to .loading. ViewState passed to View as a single unit.",
+      "files": [],
+      "assertions": [
+        "ViewState is a Swift enum with associated values \u2014 not a struct or class with multiple boolean/optional fields",
+        "Defines at least these states: loading, loaded([FeedItem]), loadingMore([FeedItem]), error(String) \u2014 empty state can be a separate case OR represented as loaded([])",
+        "Pull-to-refresh while in loadingMore state is handled gracefully \u2014 either transitions to .loading (fresh start) or keeps showing existing content while refreshing (better UX)",
+        "Presenter calls a SINGLE view method like `view?.render(.loading)` \u2014 NOT separate calls like `view?.showLoading()` AND `view?.hideContent()`",
+        "Interactor never receives a ViewState \u2014 it only receives domain commands (fetchFeed, loadMoreFeed, refreshFeed)",
+        "View renders each enum case distinctly \u2014 table visibility, spinner, error UI driven by the single ViewState value"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "god-interactor-decomposition",
+      "prompt": "This Interactor is 400 lines and doing too much \u2014 it handles user profile loading, avatar upload, settings fetch, notification preferences, and follow/unfollow users. Decompose it correctly into the right VIPER structure.\n\n```swift\nclass ProfileInteractor {\n    weak var output: ProfileInteractorOutput?\n    var userService: UserServiceProtocol\n    var mediaService: MediaServiceProtocol\n    var settingsService: SettingsServiceProtocol\n    var notificationService: NotificationServiceProtocol\n    \n    func loadProfile(userId: String) { ... }\n    func uploadAvatar(_ image: UIImage) { ... }\n    func loadSettings() { ... }\n    func updateNotificationPreferences(_ prefs: NotificationPrefs) { ... }\n    func followUser(userId: String) { ... }\n    func unfollowUser(userId: String) { ... }\n}\n```",
+      "expected_output": "Split into separate use-case Interactors (ProfileLoadInteractor, AvatarUploadInteractor, etc.), each with a single use case. Services injected per Interactor. Presenter holds multiple Interactor references. No orchestrator Interactor.",
+      "files": [],
+      "assertions": [
+        "Splits into at least 3 separate Interactors, each representing a single use case",
+        "Each Interactor has a focused public API matching its use case \u2014 a single method, or a small cohesive set of related methods (e.g. follow/unfollow as one use case)",
+        "Shared services (UserService, MediaService) are injected into each Interactor separately via constructor \u2014 not shared via singleton or property",
+        "No orchestrating Interactor that calls other Interactors internally \u2014 each Interactor talks directly to its required services",
+        "Presenter holds multiple Interactor references (one per use case) \u2014 this is correct VIPER, not an anti-pattern",
+        "Each Interactor has its own output protocol \u2014 not a single massive ProfileInteractorOutput with methods for all use cases",
+        "Presenter conforms to all relevant output protocols (or delegates to separate handlers)"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "entities-domain-layer",
+      "prompt": "Design the Entity and domain data layer for a VIPER e-commerce app with four modules: ProductListModule, ProductDetailModule, CartModule, and CheckoutModule. Show where entity files should live in the folder structure, what they contain, and how Interactors pass data to Presenters without exposing raw entities.",
+      "expected_output": "Entities in a shared domain layer outside module folders. Interactors map Entities to response structs before passing to Presenters. Entities are plain structs. Multiple modules reference the same Product entity type.",
+      "files": [],
+      "assertions": [
+        "Entities (Product, CartItem, Order) are defined in a SHARED domain layer OUTSIDE individual module folders \u2014 not inside any single module's directory",
+        "Entity files contain pure Swift structs with no UIKit imports \u2014 only Foundation (for Codable, Hashable, etc.)",
+        "Interactors do NOT pass raw Entity types to Presenter output methods \u2014 they map to intermediate result/response structs first",
+        "Different modules reference the SAME shared Product entity type \u2014 NOT separate types like ProductListItem vs ProductDetailProduct for the same concept",
+        "Presenter maps response structs to ViewModels before passing to View \u2014 entities never reach the View layer",
+        "Computed properties in entities contain derived values only \u2014 no network calls, no formatting, no business logic"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "error-propagation-chain",
+      "prompt": "Implement the error propagation chain for a VIPER checkout flow. A NetworkService throws URLError, the CartService wraps it in a CartError, the Interactor receives CartError and notifies the Presenter, and the Presenter maps it to a user-facing message on the View. Show the complete chain from URLError at the service level to the error string displayed to the user.",
+      "expected_output": "Layered error transformation: URLError \u2192 CartError (service boundary) \u2192 Interactor maps CartError to domain result \u2192 Presenter maps domain result to user message string. Each layer transforms the error to match the abstraction of the next layer. View only sees strings.",
+      "files": [],
+      "assertions": [
+        "Error type is transformed at each VIPER boundary \u2014 URLError/NSError never reaches the Presenter",
+        "Service layer maps URLError to a domain-level CartError enum with meaningful cases",
+        "Interactor calls Presenter output with a result type or specific error case \u2014 NOT the raw CartError or URLError",
+        "Presenter maps domain error cases to human-readable strings \u2014 it does NOT pass Error or NSError objects to the View",
+        "View protocol method receives a String error message \u2014 NOT an Error type: `func showError(_ message: String)` NOT `func showError(_ error: Error)`",
+        "Error cases are exhaustively handled \u2014 no wildcard catch-all that swallows specific error context"
+      ]
+    }
+  ]
+}

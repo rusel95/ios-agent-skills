@@ -1,0 +1,705 @@
+{
+  "skill_name": "mvvm-uikit-architecture",
+  "eval_structure": "reference-file × difficulty (simple/medium/complex)",
+  "evals": [
+    {
+      "id": 1,
+      "reference": "viewmodel",
+      "difficulty": "simple",
+      "name": "viewmodel-simple",
+      "prompt": "What's wrong with this ViewModel?\n\n```swift\nimport UIKit\n\nclass ProfileViewModel: ObservableObject {\n    @Published var avatar: UIImage?\n    @Published var username: String = \"\"\n\n    func formattedName(_ name: String) -> NSAttributedString {\n        let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 16)]\n        return NSAttributedString(string: name, attributes: attrs)\n    }\n}\n```",
+      "expected_output": "ViewModel imports UIKit — this violates the core MVVM rule that ViewModels must be platform-agnostic. Importing UIKit: (1) Prevents unit testing without a simulator/device (UIKit requires a running UI environment), (2) Couples the ViewModel to iOS platform, blocking reuse on macOS/visionOS, (3) Signals the ViewModel knows about presentation concerns. Fix: expose `avatarName: String` instead of `UIImage`, return `String` from formatting methods instead of `NSAttributedString`.",
+      "assertions": [
+        {
+          "id": "VM1.1",
+          "text": "Identifies UIKit import as the core violation",
+          "rationale": "Rule #1 from skill: ViewModels never import UIKit"
+        },
+        {
+          "id": "VM1.2",
+          "text": "Explains this breaks unit testability (UIKit requires simulator)",
+          "discriminating": true,
+          "rationale": "Skill specifically states UIKit import prevents unit testing — baseline may only mention platform coupling"
+        },
+        {
+          "id": "VM1.3",
+          "text": "Recommends exposing platform-agnostic types (String for avatar name, String for formatted text)",
+          "rationale": "Correct fix: expose iconName/imageName and plain String"
+        },
+        {
+          "id": "VM1.4",
+          "text": "Identifies missing private(set) on @Published properties as a separate violation (unidirectional data flow not enforced)",
+          "discriminating": true,
+          "rationale": "Skill flags private(set) as a distinct violation beyond the UIKit import — baseline typically focuses only on the import issue"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "reference": "viewmodel",
+      "difficulty": "medium",
+      "name": "viewmodel-medium",
+      "prompt": "Identify the state management anti-pattern and the fix:\n\n```swift\nclass ProductListViewModel: ObservableObject {\n    @Published var isLoading = false\n    @Published var products: [Product] = []\n    @Published var errorMessage: String?\n    @Published var isEmpty = false\n\n    func fetch() {\n        isLoading = true\n        errorMessage = nil\n        service.fetchProducts { [weak self] result in\n            self?.isLoading = false\n            switch result {\n            case .success(let items):\n                self?.products = items\n                self?.isEmpty = items.isEmpty\n            case .failure(let error):\n                self?.errorMessage = error.localizedDescription\n            }\n        }\n    }\n}\n```",
+      "expected_output": "Separate boolean flags allow impossible states: `isLoading = true` AND `errorMessage != nil` simultaneously, or `isEmpty = true` AND `products.count > 0`. The ViewController must handle combinations of four independent publishers, making the switch logic complex and bug-prone. Fix: use a `ViewState<T>` enum with mutually exclusive cases — `.loading`, `.loaded([Product])`, `.empty`, `.error(String)`. One `@Published private(set) var state: ViewState<[Product]>` replaces all four properties.",
+      "assertions": [
+        {
+          "id": "VM2.1",
+          "text": "Identifies separate boolean flags allow impossible states (e.g., isLoading + errorMessage simultaneously)",
+          "discriminating": true,
+          "rationale": "Impossible state argument is the skill's specific rationale for ViewState — baseline may note the complexity without naming the impossibility"
+        },
+        {
+          "id": "VM2.2",
+          "text": "Recommends ViewState<T> enum with mutually exclusive cases (.loading, .loaded, .empty, .error)",
+          "discriminating": true,
+          "rationale": "ViewState<T> is the skill-prescribed fix — baseline often suggests just combining booleans, not an enum"
+        },
+        {
+          "id": "VM2.3",
+          "text": "Notes one @Published property replaces four",
+          "rationale": "Demonstrates the simplification ViewState provides"
+        },
+        {
+          "id": "VM2.4",
+          "text": "Shows impossible states table or lists specific invalid combinations (e.g., isLoading=true AND errorMessage!=nil simultaneously)",
+          "discriminating": true,
+          "rationale": "Skill response enumerates concrete impossible state combinations in a table — baseline typically describes the problem abstractly without listing specific combinations"
+        },
+        {
+          "id": "VM2.5",
+          "text": "Warns about race conditions between separate publisher emissions (intermediate inconsistent state between CombineLatest updates)",
+          "discriminating": true,
+          "rationale": "Skill identifies that separate @Published properties cause intermediate glitch states between emissions — baseline focuses on logical impossibility but misses the temporal race"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "reference": "viewmodel",
+      "difficulty": "complex",
+      "name": "viewmodel-complex",
+      "prompt": "Audit this ViewModel for all MVVM violations. Rank by severity:\n\n```swift\nimport UIKit\n\nclass OrderViewModel: ObservableObject {\n    @Published var orders: [Order] = []\n    var isLoading: Bool = false\n    var errorMessage: String?\n    var tableView: UITableView?  // Passed from VC\n\n    func refresh() {\n        isLoading = true\n        service.fetchOrders { [weak self] result in\n            DispatchQueue.main.async {\n                self?.isLoading = false\n                switch result {\n                case .success(let orders):\n                    self?.orders = orders\n                    self?.tableView?.reloadData()  // Direct UI call\n                case .failure(let error):\n                    self?.errorMessage = error.localizedDescription\n                }\n            }\n        }\n    }\n}\n\n// In ViewController:\nviewModel.orders = []       // VC writes VM state\nviewModel.isLoading = true  // VC writes VM state\n```",
+      "expected_output": "Four violations ranked by severity: (1) 🔴 Critical: UITableView reference in ViewModel — ViewModel owns a UI object, creates a retain cycle (VM → tableView → VC → VM), couples to UIKit. Remove entirely; VC observes @Published state. (2) 🔴 Critical: tableView?.reloadData() called from ViewModel — ViewModel must never call UI methods; state change propagates via Combine bindings. (3) 🟡 High: VC writes ViewModel state directly (viewModel.orders = [], viewModel.isLoading = true) — state properties must be `private(set)`, VC only forwards user actions. (4) 🟢 Medium: Separate isLoading/errorMessage booleans instead of ViewState<T> enum — allows impossible states.",
+      "assertions": [
+        {
+          "id": "VM3.1",
+          "text": "Flags UITableView reference in ViewModel as Critical — creates retain cycle and UIKit coupling",
+          "discriminating": true,
+          "rationale": "VM holding a UI reference creates the VM→UITableView→VC→VM retain cycle — skill-specific anti-pattern"
+        },
+        {
+          "id": "VM3.2",
+          "text": "Flags tableView?.reloadData() called from ViewModel as Critical",
+          "rationale": "ViewModel must never call UI methods — all updates via Combine"
+        },
+        {
+          "id": "VM3.3",
+          "text": "Identifies VC writing ViewModel state as a High violation — properties must be private(set)",
+          "discriminating": true,
+          "rationale": "private(set) enforcement for unidirectional data flow is a key skill rule"
+        },
+        {
+          "id": "VM3.4",
+          "text": "Identifies separate boolean flags (isLoading + errorMessage) as a Medium violation — use ViewState<T>",
+          "rationale": "Impossible state pattern from skill"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "reference": "combine-bindings",
+      "difficulty": "simple",
+      "name": "combine-bindings-simple",
+      "prompt": "Will this code cause a memory leak?\n\n```swift\nclass FeedViewController: UIViewController {\n    var viewModel: FeedViewModel!\n    var cancellables = Set<AnyCancellable>()\n\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        viewModel.$posts\n            .sink { posts in\n                self.tableView.reloadData()\n            }\n            .store(in: &cancellables)\n    }\n}\n```",
+      "expected_output": "Yes — retain cycle. The exact path is: self (FeedViewController) → cancellables (Set<AnyCancellable>) → AnyCancellable → closure → self. The closure captures self strongly, and self owns cancellables which owns the closure. Neither can be deallocated. Fix: add [weak self] and guard or optional chain: `.sink { [weak self] posts in self?.tableView.reloadData() }`.",
+      "assertions": [
+        {
+          "id": "CB1.1",
+          "text": "Confirms there is a retain cycle",
+          "rationale": "Core sink retain cycle"
+        },
+        {
+          "id": "CB1.2",
+          "text": "Traces the exact cycle path: self → cancellables → AnyCancellable → closure → self",
+          "discriminating": true,
+          "rationale": "Skill documents this exact path — baseline may say 'strong capture' without tracing the cancellables chain"
+        },
+        {
+          "id": "CB1.3",
+          "text": "Fixes with [weak self] in the sink closure",
+          "rationale": "Standard fix"
+        },
+        {
+          "id": "CB1.4",
+          "text": "Identifies missing .receive(on: DispatchQueue.main) as an additional issue — sink updates UIKit from potentially background thread",
+          "discriminating": true,
+          "rationale": "Skill response catches the threading issue in addition to the retain cycle — baseline focuses solely on the memory leak"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "reference": "combine-bindings",
+      "difficulty": "medium",
+      "name": "combine-bindings-medium",
+      "prompt": "Find all Combine binding issues:\n\n```swift\nclass ProductViewController: UIViewController {\n    private let viewModel: ProductViewModel\n    private var cancellables = Set<AnyCancellable>()\n\n    init(viewModel: ProductViewModel) {\n        self.viewModel = viewModel\n        super.init(nibName: nil, bundle: nil)\n        // Bind here to get state immediately:\n        viewModel.$product\n            .sink { [weak self] product in\n                self?.titleLabel.text = product?.name\n            }\n            .store(in: &cancellables)\n    }\n}\n```",
+      "expected_output": "Two issues: (1) Binding in init — at this point titleLabel does not exist yet (outlets are nil until viewDidLoad). Calling self?.titleLabel.text will silently fail or crash depending on whether it's a force-unwrap. Move all bindings to viewDidLoad via a setupBindings() method. (2) Missing .receive(on: DispatchQueue.main) — the service layer may deliver on a background thread; titleLabel.text must be set on the main thread. Add .receive(on: DispatchQueue.main) before .sink.",
+      "assertions": [
+        {
+          "id": "CB2.1",
+          "text": "Identifies binding in init causes nil outlet access (views not loaded until viewDidLoad)",
+          "discriminating": true,
+          "rationale": "Skill rule: bind in viewDidLoad, never in init — baseline often focuses only on weak self"
+        },
+        {
+          "id": "CB2.2",
+          "text": "Recommends moving bindings to viewDidLoad via setupBindings()",
+          "rationale": "Skill-prescribed pattern: setupBindings() called from viewDidLoad"
+        },
+        {
+          "id": "CB2.3",
+          "text": "Identifies missing .receive(on: DispatchQueue.main) before UI update in sink",
+          "discriminating": true,
+          "rationale": "Skill rule: always .receive(on: .main) before UI updates — background thread UI mutation"
+        },
+        {
+          "id": "CB2.4",
+          "text": "Explains @Published fires immediately on subscription (CurrentValueSubject behavior) so the nil-outlet access happens during init, not just on future updates",
+          "discriminating": true,
+          "rationale": "Skill explains @Published replays current value to new subscribers — the binding in init fires immediately with nil outlets, not just on subsequent changes. Baseline misses this subtlety."
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "reference": "combine-bindings",
+      "difficulty": "complex",
+      "name": "combine-bindings-complex",
+      "prompt": "This search feature receives no updates even though the ViewModel publishes. Find all issues:\n\n```swift\nclass SearchViewModel: ObservableObject {\n    let resultsPublisher = PassthroughSubject<[SearchResult], Never>()\n    let errorPublisher = PassthroughSubject<String, Never>()\n\n    func search(query: String) {\n        apiService.search(query: query) { [weak self] result in\n            switch result {\n            case .success(let results): self?.resultsPublisher.send(results)\n            case .failure(let error): self?.errorPublisher.send(error.localizedDescription)\n            }\n        }\n    }\n}\n\n// In ViewController:\nviewModel.resultsPublisher\n    .receive(on: DispatchQueue.main)\n    .sink { [weak self] results in self?.render(results) }\n// Note: not stored in cancellables\n```",
+      "expected_output": "Two issues: (1) Sink not stored in cancellables — the AnyCancellable returned by sink is immediately deallocated (not stored), so the subscription is cancelled before any values arrive. Fix: .store(in: &cancellables). (2) PassthroughSubject for stateful results instead of @Published — PassthroughSubject is for one-shot events (e.g., navigation, alerts). Subscribers who connect after a value was sent miss it. New subscribers (e.g., after view reappears) need the current results. Use @Published private(set) var results: [SearchResult] = [] so subscribers always get the current value on subscription.",
+      "assertions": [
+        {
+          "id": "CB3.1",
+          "text": "CRITICAL: Identifies sink not stored in cancellables — subscription immediately cancelled",
+          "discriminating": true,
+          "rationale": "Missing .store is the exact reason no updates arrive — skill makes this the first thing to check"
+        },
+        {
+          "id": "CB3.2",
+          "text": "Identifies PassthroughSubject is wrong for stateful data — use @Published instead",
+          "discriminating": true,
+          "rationale": "Skill distinguishes PassthroughSubject (one-shot events) vs @Published (state) — baseline often accepts PassthroughSubject for all Combine usage"
+        },
+        {
+          "id": "CB3.3",
+          "text": "Explains @Published replays current value to new subscribers; PassthroughSubject does not",
+          "rationale": "Key behavioral difference explaining why new subscribers miss values"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "reference": "coordinator",
+      "difficulty": "simple",
+      "name": "coordinator-simple",
+      "prompt": "What's wrong with this navigation code?\n\n```swift\nclass ProductListViewController: UIViewController {\n    func didSelectProduct(_ product: Product) {\n        let detailVC = ProductDetailViewController()\n        detailVC.product = product\n        navigationController?.pushViewController(detailVC, animated: true)\n    }\n}\n```",
+      "expected_output": "ViewController instantiating and pushing another ViewController is a MVVM anti-pattern. ProductListViewController now knows about ProductDetailViewController — coupling two screens together. This prevents reusing either screen in different flows and makes navigation untestable. Fix: ViewController calls `viewModel.onProductSelected?(product)` via a closure. The Coordinator sets this closure and handles VC creation and navigation. VCs must never instantiate other VCs.",
+      "assertions": [
+        {
+          "id": "CO1.1",
+          "text": "Identifies VC instantiating another VC as the violation",
+          "rationale": "Navigation is Coordinator's responsibility from skill"
+        },
+        {
+          "id": "CO1.2",
+          "text": "Recommends ViewModel navigation closure (onProductSelected?) that Coordinator sets",
+          "discriminating": true,
+          "rationale": "ViewModel signals navigation intent via closures — skill's specific pattern vs generic 'use a delegate'"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "reference": "coordinator",
+      "difficulty": "medium",
+      "name": "coordinator-medium",
+      "prompt": "This coordinator setup leaks memory. Find the issue:\n\n```swift\nclass AppCoordinator: Coordinator {\n    var childCoordinators: [Coordinator] = []\n    var navigationController: UINavigationController\n\n    func showAuth() {\n        let authCoord = AuthCoordinator(navigationController: navigationController)\n        childCoordinators.append(authCoord)\n        authCoord.start()\n    }\n}\n\nclass AuthCoordinator: Coordinator {\n    var navigationController: UINavigationController\n\n    func finishAuth() {\n        navigationController.dismiss(animated: true)\n        // Done — parent should clean up\n    }\n}\n```",
+      "expected_output": "AuthCoordinator is never removed from childCoordinators after it finishes — memory leak. The AuthCoordinator and everything it owns (ViewModels, ViewControllers) remain allocated. Fix: implement the didFinish pattern. AuthCoordinator exposes a closure: `var didFinish: ((AuthCoordinator) -> Void)?`. AppCoordinator sets it before appending: `authCoord.didFinish = { [weak self] coord in self?.childCoordinators.removeAll { $0 === coord } }`. AuthCoordinator calls `didFinish?(self)` in finishAuth().",
+      "assertions": [
+        {
+          "id": "CO2.1",
+          "text": "Identifies AuthCoordinator never removed from childCoordinators — memory leak",
+          "rationale": "Child coordinator lifecycle from coordinator-navigation.md"
+        },
+        {
+          "id": "CO2.2",
+          "text": "Recommends didFinish closure pattern: coordinator calls didFinish?(self), parent removes it",
+          "discriminating": true,
+          "rationale": "Exact didFinish coordinator cleanup pattern from skill — baseline may suggest a delegate protocol instead of the closure approach"
+        },
+        {
+          "id": "CO2.3",
+          "text": "Shows removeAll { $0 === coord } to remove by identity from childCoordinators",
+          "rationale": "Identity-based removal is the correct mechanism for reference types"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "reference": "coordinator",
+      "difficulty": "complex",
+      "name": "coordinator-complex",
+      "prompt": "Find all coordinator issues in this code:\n\n```swift\nclass ProfileCoordinator: Coordinator {\n    var navigationController: UINavigationController\n    var profileVC: ProfileViewController  // Stored reference\n    var childCoordinators: [Coordinator] = []\n\n    func start() {\n        profileVC = ProfileViewController(viewModel: ProfileViewModel())\n        navigationController.pushViewController(profileVC, animated: true)\n    }\n\n    func showSettings() {\n        let settingsCoord = SettingsCoordinator(navigationController: navigationController)\n        childCoordinators.append(settingsCoord)\n        settingsCoord.start()\n        // settingsCoord has no didFinish set\n    }\n}\n// Note: ProfileCoordinator is not set as navigationController.delegate\n```",
+      "expected_output": "Three issues: (1) Coordinator strongly holds profileVC — UINavigationController already retains pushed VCs. This double-retain prevents VC deallocation after popping. Never store VC references in coordinators. (2) settingsCoord.didFinish not set — SettingsCoordinator will never be removed from childCoordinators, leaking it and all its VCs. (3) ProfileCoordinator not set as UINavigationControllerDelegate — the coordinator has no way to detect when the user taps the Back button. Without this, child coordinators aren't cleaned up when the user navigates back natively. Wire: `navigationController.delegate = self` and implement `navigationController(_:didShow:animated:)`.",
+      "assertions": [
+        {
+          "id": "CO3.1",
+          "text": "Identifies Coordinator storing strong VC reference prevents deallocation after pop",
+          "discriminating": true,
+          "rationale": "navController already retains VCs — double retain is a coordinator-specific leak from skill"
+        },
+        {
+          "id": "CO3.2",
+          "text": "Identifies missing didFinish on settingsCoord — SettingsCoordinator never cleaned up",
+          "rationale": "Child coordinator lifecycle from coordinator-navigation.md"
+        },
+        {
+          "id": "CO3.3",
+          "text": "Identifies missing UINavigationControllerDelegate — back button taps undetected, child coordinators not cleaned up",
+          "discriminating": true,
+          "rationale": "UINavigationControllerDelegate for back-button cleanup is a key coordinator pattern from skill"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "reference": "dependency-injection",
+      "difficulty": "simple",
+      "name": "dependency-injection-simple",
+      "prompt": "What's wrong with this ViewModel's dependency access?\n\n```swift\nclass UserProfileViewModel: ObservableObject {\n    @Published private(set) var state: ViewState<User> = .loading\n\n    func loadProfile() {\n        let service = NetworkService.shared\n        service.fetchUser { [weak self] result in\n            // ...\n        }\n    }\n}\n```",
+      "expected_output": "ViewModel accesses NetworkService.shared (singleton) directly — hidden dependency, tightly coupled to a concrete type. This makes the ViewModel untestable (can't inject a mock). Fix: inject via constructor using a protocol type: `init(service: NetworkServiceProtocol)`. The Coordinator or factory creates the ViewModel with the real service; tests pass a MockNetworkService.",
+      "assertions": [
+        {
+          "id": "DI1.1",
+          "text": "Identifies singleton access as a hidden dependency preventing testability",
+          "rationale": "Constructor injection rule from dependency-injection.md"
+        },
+        {
+          "id": "DI1.2",
+          "text": "Recommends protocol-based constructor injection: init(service: NetworkServiceProtocol)",
+          "discriminating": true,
+          "rationale": "Skill prescribes protocol types specifically, not just 'use init injection' — enables mock injection in tests"
+        },
+        {
+          "id": "DI1.3",
+          "text": "Shows Coordinator or factory as the injection site — Coordinator creates ViewModel with real service",
+          "discriminating": true,
+          "rationale": "Skill wires DI through the Coordinator layer (coordinator creates VM with real service, tests use mock) — baseline typically omits who creates the ViewModel"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "reference": "dependency-injection",
+      "difficulty": "medium",
+      "name": "dependency-injection-medium",
+      "prompt": "This Storyboard-based VC has a DI problem. What is it and what are the options?\n\n```swift\n// In Coordinator:\nlet vc = UIStoryboard(name: \"Profile\", bundle: nil)\n    .instantiateViewController(withIdentifier: \"ProfileVC\") as! ProfileViewController\nvc.viewModel = ProfileViewModel(service: networkService)  // Property injection\nnavigationController.pushViewController(vc, animated: true)\n\n// ProfileViewController:\nclass ProfileViewController: UIViewController {\n    var viewModel: ProfileViewModel?  // Optional — may be nil in viewDidLoad\n    override func viewDidLoad() {\n        super.viewDidLoad();\n        viewModel?.loadProfile()  // Silently fails if nil\n    }\n}\n```",
+      "expected_output": "Two issues: (1) viewModel is optional — if the coordinator forgets to set it, viewDidLoad silently fails. Prefer a non-optional property set before viewDidLoad runs. (2) Storyboard VCs can't use constructor injection via a custom init directly with instantiateViewController(withIdentifier:). Better approaches: (a) Use instantiateViewController(creator:) (iOS 13+) to call a custom init with non-optional dependencies, (b) Migrate to programmatic VC creation to enable full constructor injection. If property injection is kept (e.g., for backward compatibility), assert non-nil in viewDidLoad rather than optional-chaining silently.",
+      "assertions": [
+        {
+          "id": "DI2.1",
+          "text": "Identifies optional viewModel allows silent failure if coordinator forgets to set it",
+          "rationale": "Non-optional dependencies via constructor are the skill's standard"
+        },
+        {
+          "id": "DI2.2",
+          "text": "Explains instantiateViewController(withIdentifier:) prevents custom init — property injection limitation of Storyboards",
+          "discriminating": true,
+          "rationale": "Skill covers Storyboard DI limitations specifically — baseline may not know about instantiateViewController(creator:)"
+        },
+        {
+          "id": "DI2.3",
+          "text": "Recommends instantiateViewController(creator:) (iOS 13+) or programmatic VC creation as fixes",
+          "discriminating": true,
+          "rationale": "instantiateViewController(creator:) is the iOS 13+ Storyboard DI solution from dependency-injection.md"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "reference": "dependency-injection",
+      "difficulty": "complex",
+      "name": "dependency-injection-complex",
+      "prompt": "This coordinator duplicates dependency creation everywhere. What's the correct architectural fix?\n\n```swift\nclass OrderCoordinator: Coordinator {\n    func showOrderDetail(id: UUID) {\n        let service = URLSession.shared\n        let repo = OrderRepository(service: service)\n        let vm = OrderDetailViewModel(repo: repo, orderID: id)\n        let vc = OrderDetailViewController(viewModel: vm)\n        navigationController.pushViewController(vc, animated: true)\n    }\n\n    func showOrderHistory() {\n        let service = URLSession.shared  // Duplicated construction\n        let repo = OrderRepository(service: service)\n        let vm = OrderHistoryViewModel(repo: repo)\n        let vc = OrderHistoryViewController(viewModel: vm)\n        navigationController.pushViewController(vc, animated: true)\n    }\n}\n```",
+      "expected_output": "The Coordinator is doing dependency construction — it should only do navigation and screen wiring. Fix: introduce a ScreenFactory protocol injected into the Coordinator via constructor. The factory encapsulates VC+VM creation with pre-configured dependencies. OrderCoordinator becomes: `func showOrderDetail(id: UUID) { let vc = factory.makeOrderDetail(id: id); navController.pushViewController(vc, animated: true) }`. This makes the Coordinator testable with a MockScreenFactory and moves dependency setup to one place (the AppCompositionRoot or DI container).",
+      "assertions": [
+        {
+          "id": "DI3.1",
+          "text": "Identifies Coordinator doing dependency construction — violates single responsibility",
+          "rationale": "Coordinator responsibility is navigation, not dependency wiring"
+        },
+        {
+          "id": "DI3.2",
+          "text": "Recommends ScreenFactory protocol injected into Coordinator — factory creates VC+VM pairs",
+          "discriminating": true,
+          "rationale": "Factory pattern for VC+VM creation is the skill-prescribed solution from dependency-injection.md"
+        },
+        {
+          "id": "DI3.3",
+          "text": "Notes MockScreenFactory makes the Coordinator independently testable",
+          "discriminating": true,
+          "rationale": "Testability through factory injection is the key benefit — baseline often stops at 'extract a factory' without the testability angle"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "reference": "viewstate",
+      "difficulty": "simple",
+      "name": "viewstate-simple",
+      "prompt": "How should a ViewController render these three ViewModel states?\n\n```swift\nenum ViewState<T> {\n    case loading\n    case loaded(T)\n    case empty\n    case error(String)\n}\n\nclass ItemListViewModel: ObservableObject {\n    @Published private(set) var state: ViewState<[Item]> = .loading\n}\n```",
+      "expected_output": "Bind in viewDidLoad via setupBindings(). Use a switch over state in the sink closure: .loading shows activityIndicator, hides tableView/emptyView/errorView. .loaded(items) hides indicator, applies snapshot to DiffableDataSource. .empty hides indicator and tableView, shows emptyStateView. .error(message) hides indicator, shows errorView with message. Every case must be handled — the compiler enforces exhaustiveness. Never use if-else chains on separate boolean properties.",
+      "assertions": [
+        {
+          "id": "VS1.1",
+          "text": "Uses switch (not if-else chains) over ViewState in the sink",
+          "discriminating": true,
+          "rationale": "Exhaustive switch is the skill-prescribed approach — compiler enforces all cases are handled"
+        },
+        {
+          "id": "VS1.2",
+          "text": "Handles all four cases: loading, loaded, empty, error",
+          "rationale": "All cases must be handled — non-exhaustive switch is a violation"
+        },
+        {
+          "id": "VS1.3",
+          "text": "Binding placed in viewDidLoad (not init or viewWillAppear)",
+          "rationale": "Skill rule: bind in viewDidLoad"
+        },
+        {
+          "id": "VS1.4",
+          "text": "Uses hide-all-then-show reset pattern: hides all state views before the switch, then shows only the relevant view per case",
+          "discriminating": true,
+          "rationale": "Skill prescribes deterministic reset before switch to prevent stale UI from previous state — baseline typically sets visibility per-case without a reset step"
+        },
+        {
+          "id": "VS1.5",
+          "text": "Uses DiffableDataSource snapshot apply (applySnapshot) for .loaded — explicitly warns against tableView.reloadData()",
+          "discriminating": true,
+          "rationale": "Skill mandates snapshot-based updates when using DiffableDataSource — baseline often uses reloadData() or omits DiffableDataSource entirely"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "reference": "viewstate",
+      "difficulty": "medium",
+      "name": "viewstate-medium",
+      "prompt": "What's wrong with this DiffableDataSource usage?\n\n```swift\nclass ItemListViewController: UIViewController {\n    var dataSource: UITableViewDiffableDataSource<Section, Item>?\n\n    func render(_ items: [Item]) {\n        var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()\n        snapshot.appendSections([.main])\n        snapshot.appendItems(items)\n        dataSource?.apply(snapshot, animatingDifferences: true)\n    }\n\n    func updateSingleItem(_ item: Item) {\n        tableView.reloadData()  // Quick update\n    }\n}\n```",
+      "expected_output": "Mixing DiffableDataSource with tableView.reloadData() is forbidden — calling reloadData() while using a DiffableDataSource corrupts the diffing state and can cause assertion failures or visual glitches. All table mutations must go through snapshot apply. Fix for updateSingleItem: use `snapshot.reconfigureItems([item])` (iOS 15+) which triggers cell reconfiguration without replacing cells, preserving animations. For iOS 14 and below, use `snapshot.reloadItems([item])`. Apply the updated snapshot via dataSource?.apply(snapshot, animatingDifferences: false).",
+      "assertions": [
+        {
+          "id": "VS2.1",
+          "text": "Identifies tableView.reloadData() while using DiffableDataSource as forbidden — corrupts diffing state",
+          "discriminating": true,
+          "rationale": "Mixing reloadData with DiffableDataSource is a specific UIKit constraint from viewcontroller-lifecycle.md"
+        },
+        {
+          "id": "VS2.2",
+          "text": "Recommends snapshot.reconfigureItems (iOS 15+) or reloadItems for single-item updates",
+          "discriminating": true,
+          "rationale": "reconfigureItems is the correct DiffableDataSource update API — baseline typically only knows reloadData"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "reference": "viewstate",
+      "difficulty": "complex",
+      "name": "viewstate-complex",
+      "prompt": "Find all lifecycle and state binding issues:\n\n```swift\nclass SearchViewController: UIViewController {\n    var viewModel: SearchViewModel!\n    var cancellables = Set<AnyCancellable>()\n\n    override func viewWillAppear(_ animated: Bool) {\n        super.viewWillAppear(animated)\n        viewModel.$state\n            .receive(on: DispatchQueue.main)\n            .sink { [weak self] state in\n                switch state {\n                case .loading:\n                    self?.activityIndicator.startAnimating()\n                case .loaded(let results):\n                    self?.activityIndicator.stopAnimating()\n                    self?.render(results)\n                }\n            }\n            .store(in: &cancellables)\n    }\n}\n```",
+      "expected_output": "Two issues: (1) Binding in viewWillAppear — each time the view reappears (e.g., after returning from a detail screen) a new subscription is added to cancellables. Over N appearances there are N duplicate subscriptions all firing. Move bindings to viewDidLoad which runs exactly once. If fresh data is needed on appear, call viewModel.refresh() in viewWillAppear without re-subscribing. (2) Non-exhaustive switch — .empty and .error cases are missing. The compiler will warn or error (in Swift 6). Add all cases; unhandled ViewState cases leave the UI in an undefined state.",
+      "assertions": [
+        {
+          "id": "VS3.1",
+          "text": "Identifies binding in viewWillAppear accumulates duplicate subscriptions on each appearance",
+          "discriminating": true,
+          "rationale": "viewWillAppear binding duplication is a specific lifecycle mistake from viewcontroller-lifecycle.md"
+        },
+        {
+          "id": "VS3.2",
+          "text": "Recommends moving bindings to viewDidLoad; calling viewModel.refresh() in viewWillAppear for fresh data",
+          "rationale": "Correct separation: subscribe once in viewDidLoad, trigger data reload in viewWillAppear"
+        },
+        {
+          "id": "VS3.3",
+          "text": "Identifies non-exhaustive switch — .empty and .error cases missing",
+          "rationale": "ViewState enum must be handled exhaustively"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "reference": "testing",
+      "difficulty": "simple",
+      "name": "testing-simple",
+      "prompt": "Write the test structure to verify this ViewModel emits .loading then .loaded:\n\n```swift\nclass ItemViewModel: ObservableObject {\n    @Published private(set) var state: ViewState<[Item]> = .loading\n    private let service: ItemServiceProtocol\n\n    init(service: ItemServiceProtocol) { self.service = service }\n\n    func fetch() {\n        state = .loading\n        service.fetchItems { [weak self] result in\n            switch result {\n            case .success(let items): self?.state = .loaded(items)\n            case .failure(let error): self?.state = .error(error.localizedDescription)\n            }\n        }\n    }\n}\n```",
+      "expected_output": "Use XCTestExpectation + sink. Pattern: (1) Create MockItemService with stubbed response, (2) Create sut = ItemViewModel(service: mockService), (3) Create expectation, (4) Subscribe: viewModel.$state.dropFirst().sink { if case .loaded = $0 { expectation.fulfill() } }.store(in: &cancellables), (5) sut.fetch(), (6) await fulfillment(of: [expectation], timeout: 1.0). Note: dropFirst() skips the initial .loading emission if testing the subsequent state; omit dropFirst() if testing the sequence. Use await fulfillment(of:) — never wait(for:) in async tests.",
+      "assertions": [
+        {
+          "id": "TE1.1",
+          "text": "Uses XCTestExpectation + sink to test the @Published state publisher",
+          "rationale": "Core Combine testing pattern from testing.md"
+        },
+        {
+          "id": "TE1.2",
+          "text": "Uses protocol mock (MockItemService) injected via constructor",
+          "rationale": "Testing through injected protocol mock"
+        },
+        {
+          "id": "TE1.3",
+          "text": "Uses await fulfillment(of:) — not wait(for:)",
+          "discriminating": true,
+          "rationale": "Skill explicitly warns: use await fulfillment(of:) in async tests, wait(for:) deadlocks — baseline often uses wait(for:)"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "reference": "testing",
+      "difficulty": "medium",
+      "name": "testing-medium",
+      "prompt": "What's missing from this test setup?\n\n```swift\nclass ProfileViewModelTests: XCTestCase {\n    var sut: ProfileViewModel!\n    var mockService: MockProfileService!\n    var cancellables: Set<AnyCancellable>!\n\n    override func setUp() {\n        super.setUp()\n        mockService = MockProfileService()\n        sut = ProfileViewModel(service: mockService)\n        cancellables = []\n    }\n\n    override func tearDown() {\n        sut = nil\n        mockService = nil\n        cancellables = nil\n        super.tearDown()\n    }\n}\n```",
+      "expected_output": "Missing memory leak detection. Add `addTeardownBlock { [weak sut] in XCTAssertNil(sut) }` in setUp immediately after creating sut. This verifies sut is actually deallocated when set to nil in tearDown, catching retain cycles that would otherwise silently persist between test runs. Without it, a retain cycle in the ViewModel (e.g., a stored closure capturing self strongly) would never be caught by the test suite.",
+      "assertions": [
+        {
+          "id": "TE2.1",
+          "text": "Identifies missing memory leak detection",
+          "rationale": "Memory leak detection is a required part of testing setup from testing.md"
+        },
+        {
+          "id": "TE2.2",
+          "text": "Adds addTeardownBlock { [weak sut] in XCTAssertNil(sut) } in setUp after creating sut",
+          "discriminating": true,
+          "rationale": "Exact addTeardownBlock pattern from testing.md — baseline typically uses deinit or manual weak reference checks, not addTeardownBlock"
+        },
+        {
+          "id": "TE2.3",
+          "text": "Explains this catches retain cycles that are otherwise silent (sut would survive tearDown)",
+          "rationale": "Explains why this pattern is necessary"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "reference": "testing",
+      "difficulty": "complex",
+      "name": "testing-complex",
+      "prompt": "This test hangs intermittently. Find the issue and fix it:\n\n```swift\nfunc testSearchReturnsResults() async {\n    // Arrange\n    let expectation = XCTestExpectation(description: \"results received\")\n    mockService.stubbedResults = [SearchResult(id: UUID(), title: \"Test\")]\n    var received: [SearchResult] = []\n\n    // Act\n    sut.$state\n        .dropFirst()\n        .sink { state in\n            if case .loaded(let results) = state {\n                received = results\n                expectation.fulfill()\n            }\n        }\n        .store(in: &cancellables)\n\n    sut.search(query: \"test\")\n\n    wait(for: [expectation], timeout: 2.0)  // Hangs here\n}\n```",
+      "expected_output": "wait(for:) in an async test context blocks the current thread (the cooperative thread pool thread running the async test). If the publisher emits on the same thread via the cooperative pool, the emission can never happen while wait(for:) blocks. This causes an intermittent deadlock. Fix: replace `wait(for: [expectation], timeout: 2.0)` with `await fulfillment(of: [expectation], timeout: 2.0)`. The await suspends the test coroutine without blocking the thread, allowing the publisher to emit. Additionally, if the sink closure captures self (the test class), add [weak self] to prevent a retain cycle.",
+      "assertions": [
+        {
+          "id": "TE3.1",
+          "text": "Identifies wait(for:) blocks the cooperative thread in an async test context — causes deadlock",
+          "discriminating": true,
+          "rationale": "Skill explicitly warns: never use wait(for:) in async contexts — deadlocks cooperative pool; baseline often accepts wait(for:) as valid"
+        },
+        {
+          "id": "TE3.2",
+          "text": "Fixes with await fulfillment(of: [expectation], timeout: 2.0)",
+          "discriminating": true,
+          "rationale": "await fulfillment(of:) is the XCTest API that suspends without blocking — skill-specific knowledge"
+        },
+        {
+          "id": "TE3.3",
+          "text": "Explains await fulfillment suspends the coroutine without blocking the thread, allowing emission",
+          "rationale": "Explains why the fix works mechanically"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "reference": "refactoring",
+      "difficulty": "simple",
+      "name": "refactoring-simple",
+      "prompt": "How should you start refactoring a 1,500-line MassiveViewController to MVVM?",
+      "expected_output": "Follow the phased PR approach from the skill: (1) Create a refactoring/ directory with a per-feature plan file (e.g., refactoring/profile-screen.md) listing every issue with Location, Severity, Problem, and Fix — not just titles. (2) Phase 1 PR (≤200 lines, single concern): fix critical safety issues only — retain cycles, threading bugs, force-unwraps. These ship first because they are low-risk and high-value. (3) Phase 2: extract ViewModel — move state properties and business logic. (4) Phase 3: add Combine bindings. (5) Phase 4: add Coordinator. New findings discovered during refactoring go to refactoring/discovered.md, not into the current PR.",
+      "assertions": [
+        {
+          "id": "RF1.1",
+          "text": "Recommends creating a refactoring/ directory with per-feature plan files",
+          "discriminating": true,
+          "rationale": "refactoring/ directory protocol is the skill's prescribed workflow — baseline typically goes straight to code changes"
+        },
+        {
+          "id": "RF1.2",
+          "text": "States Phase 1 PR = critical safety issues only, ≤200 lines",
+          "discriminating": true,
+          "rationale": "≤200 lines per PR and safety-first ordering are explicit skill constraints — baseline may suggest doing everything at once"
+        },
+        {
+          "id": "RF1.3",
+          "text": "Notes new discoveries go to refactoring/discovered.md, not into the current PR",
+          "rationale": "Scope discipline: current PR stays focused, discoveries are tracked for later"
+        },
+        {
+          "id": "RF1.4",
+          "text": "Provides an anti-patterns checklist with severity levels (Critical/High/Medium) for scanning the VC before writing the plan",
+          "discriminating": true,
+          "rationale": "Skill prescribes a severity-ranked scanning checklist (force-unwraps=Critical, no ViewModel=High, reloadData=Medium) — baseline typically lists issues without severity classification"
+        },
+        {
+          "id": "RF1.5",
+          "text": "Includes a PR size reference table with maximum line counts per phase (e.g., Phase 1 ≤200, Phase 3 ≤150)",
+          "discriminating": true,
+          "rationale": "Skill provides concrete per-phase line limits in a table — baseline may mention small PRs without quantifying per phase"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "reference": "refactoring",
+      "difficulty": "medium",
+      "name": "refactoring-medium",
+      "prompt": "This PR claims to be 'Phase 1 of ProfileViewController refactor'. What's wrong with its scope?\n\n```\nPR: Refactor ProfileViewController — Phase 1\nChanged files (847 lines diff):\n- Extract ProfileViewModel (state + networking)\n- Add Combine @Published bindings\n- Add ProfileCoordinator for navigation\n- Migrate to DiffableDataSource\n- Add constructor injection\n- Fix force-unwrap on line 142\n- Fix retain cycle on line 89\n- Add ProfileViewModelTests\n```",
+      "expected_output": "PR scope violates the phased refactoring rule — 847 lines, 8 concerns mixed together. A Phase 1 PR should be ≤200 lines and a single concern. Correct breakdown: Phase 1 (≤200 lines): fix force-unwrap + retain cycle — critical safety issues only, low risk, fast to review. Phase 2: extract ProfileViewModel. Phase 3: add Combine bindings. Phase 4: add Coordinator. Phase 5: DiffableDataSource. Phase 6: tests. Each phase is independently reviewable and revertable. A large mixed PR is hard to review and risky to merge — one bug in bindings requires reverting all safety fixes.",
+      "assertions": [
+        {
+          "id": "RF2.1",
+          "text": "Identifies PR is too large (847 lines) and mixes too many concerns",
+          "rationale": "≤200 lines per PR is the skill's hard constraint"
+        },
+        {
+          "id": "RF2.2",
+          "text": "States Phase 1 should contain only critical safety fixes (force-unwrap + retain cycle)",
+          "discriminating": true,
+          "rationale": "Safety-first phase ordering is the skill's explicit rule — other concerns are not Phase 1"
+        },
+        {
+          "id": "RF2.3",
+          "text": "Shows correct phase breakdown across 5-6 separate PRs",
+          "discriminating": true,
+          "rationale": "Skill's phased approach explicitly separates each concern into its own PR — baseline often merges phases 2-3"
+        },
+        {
+          "id": "RF2.4",
+          "text": "Explains the revert risk: a bug in one concern (e.g., Coordinator) forces reverting all other changes (safety fixes, ViewModel) in a mega-PR",
+          "discriminating": true,
+          "rationale": "Skill explicitly describes the revert scenario as motivation for phased PRs — baseline typically says 'hard to review' without the revert consequence"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "reference": "refactoring",
+      "difficulty": "complex",
+      "name": "refactoring-complex",
+      "prompt": "We're migrating ProfileViewController to MVVM but have 30 existing UITests that access VC internals. How do you migrate without breaking them?\n\n```swift\n// Existing test:\nfunc testProfileLoadsUsername() {\n    let vc = ProfileViewController()\n    vc.viewDidLoad()\n    vc.loadUserData()  // Calls internal method\n    XCTAssertEqual(vc.usernameLabel.text, \"John\")\n}\n```",
+      "expected_output": "Three-step strategy: (1) Keep existing tests green throughout the migration — Phase 1 and 2 PRs must not break them. Don't delete old VC internals until the ViewModel covers the same behavior. (2) In parallel with ViewModel extraction (Phase 2), write new ViewModel tests that test behavior through the public interface (no UIKit): `XCTAssertEqual(sut.state, .loaded(expectedUser))`. These don't touch the VC. (3) Once ViewModel tests pass and cover the same behaviors, migrate the UITests to test via ViewModel or use XCUITest for end-to-end flows. Only then remove old VC internals. Log the UITest migration as a task in refactoring/discovered.md, not in the current Phase 2 PR.",
+      "assertions": [
+        {
+          "id": "RF3.1",
+          "text": "States existing tests must stay green throughout the migration — don't break them during VM extraction",
+          "discriminating": true,
+          "rationale": "Production-first rule: stability over speed — skill explicitly states keep tests green"
+        },
+        {
+          "id": "RF3.2",
+          "text": "Recommends writing ViewModel tests (no UIKit) in parallel before removing VC internals",
+          "rationale": "Test coverage must exist before removing old code"
+        },
+        {
+          "id": "RF3.3",
+          "text": "Logs UITest migration to refactoring/discovered.md as a separate task",
+          "discriminating": true,
+          "rationale": "Skill's scope discipline: current PR stays focused; discovered work goes to refactoring/discovered.md"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "reference": "anti-patterns",
+      "difficulty": "simple",
+      "name": "anti-patterns-simple",
+      "prompt": "What severity is this violation and why?\n\n```swift\noverride func viewDidLoad() {\n    super.viewDidLoad()\n    URLSession.shared.dataTask(with: profileURL) { [weak self] data, _, _ in\n        guard let data else { return }\n        let user = try? JSONDecoder().decode(User.self, from: data)\n        DispatchQueue.main.async {\n            self?.nameLabel.text = user?.name\n        }\n    }.resume()\n}\n```",
+      "expected_output": "🔴 Critical — networking in ViewController. Business logic (network call, JSON decoding) in the VC makes it completely untestable without a live network. This is the highest-severity violation in the anti-patterns checklist. Fix: extract to a ViewModel with an injected service protocol. The VC only observes @Published state and renders. This is always Phase 1 or Phase 2 in a refactoring plan — never left for later.",
+      "assertions": [
+        {
+          "id": "AP1.1",
+          "text": "Flags as Critical (🔴) severity",
+          "discriminating": true,
+          "rationale": "Skill ranks networking-in-VC as Critical — highest severity in anti-patterns.md"
+        },
+        {
+          "id": "AP1.2",
+          "text": "Explains this makes the VC completely untestable without live network",
+          "rationale": "Core reason networking belongs in ViewModel"
+        },
+        {
+          "id": "AP1.3",
+          "text": "States this must be addressed in Phase 1 or 2 — not deferred",
+          "rationale": "Critical violations ship first in the phased workflow"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "reference": "anti-patterns",
+      "difficulty": "medium",
+      "name": "anti-patterns-medium",
+      "prompt": "Code review: identify all violations and their severity:\n\n```swift\nimport UIKit\nimport Combine\n\nclass CartViewModel: ObservableObject {\n    var cartViewController: CartViewController?  // Set by VC\n    @Published var items: [CartItem] = []\n    @Published var total: Decimal = 0\n\n    func checkout() {\n        items = []\n        cartViewController?.dismiss(animated: true)\n    }\n}\n\nclass CartViewController: UIViewController {\n    var viewModel: CartViewModel?  // Optional property injection\n}\n```",
+      "expected_output": "Three violations ranked by severity: (1) 🔴 Critical: CartViewModel holds CartViewController reference — creates a retain cycle (VC → VM → VC), ViewModel owns a UIKit object, and ViewModel calls UI method (dismiss). This is the most severe: a leak + UIKit coupling + navigation-in-ViewModel. Fix: use a navigation closure (`var onCheckoutComplete: (() -> Void)?`) that the Coordinator sets; ViewModel calls `onCheckoutComplete?()`. (2) 🟡 High: viewModel is optional var — allows nil at runtime, should be non-optional via constructor injection. (3) 🟢 Medium: checkout() calls dismiss directly — navigation belongs in Coordinator via a closure.",
+      "assertions": [
+        {
+          "id": "AP2.1",
+          "text": "Flags CartViewController reference in ViewModel as Critical — retain cycle + UIKit coupling + navigation in VM",
+          "discriminating": true,
+          "rationale": "VM↔VC retain cycle via strong reference is a top-severity violation from anti-patterns.md"
+        },
+        {
+          "id": "AP2.2",
+          "text": "Recommends navigation closure (onCheckoutComplete?) set by Coordinator instead of dismiss in VM",
+          "discriminating": true,
+          "rationale": "Navigation closure pattern is the skill's specific fix — not a delegate or notification"
+        },
+        {
+          "id": "AP2.3",
+          "text": "Flags optional viewModel var as High — should be non-optional constructor injection",
+          "rationale": "Optional force-unwrapped or silently-nil dependencies are a High violation"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "reference": "anti-patterns",
+      "difficulty": "complex",
+      "name": "anti-patterns-complex",
+      "prompt": "Full anti-pattern audit — rank all violations by severity:\n\n```swift\nclass HomeViewController: UIViewController, UITableViewDataSource {\n    static var shared: HomeViewController?  // Global reference\n\n    var items: [HomeItem] = []\n    var isLoading = false\n    var currentFilter: Filter = .all\n\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        HomeViewController.shared = self\n        loadItems()\n    }\n\n    func loadItems() {\n        isLoading = true\n        APIService.shared.fetchItems(filter: currentFilter) { [weak self] result in\n            self?.isLoading = false\n            self?.items = result ?? []\n            self?.tableView.reloadData()\n        }\n    }\n\n    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {\n        let detailVC = ItemDetailViewController()\n        detailVC.item = items[indexPath.row]\n        navigationController?.pushViewController(detailVC, animated: true)\n    }\n}\n```",
+      "expected_output": "Five violations: (1) 🔴 Critical: Singleton ViewController (static shared = self) — global mutable state, memory leak (self never deallocates), multi-window unsafe, breaks navigation. Remove entirely. (2) 🔴 Critical: Networking in ViewController (loadItems calling APIService.shared) — untestable, hidden dependency. Extract to ViewModel. (3) 🔴 Critical: VC instantiating and pushing another VC in didSelectRowAt — navigation must be in Coordinator via ViewModel closure. (4) 🟡 High: No ViewModel, no ViewState enum — separate isLoading boolean, raw state in VC. (5) 🟢 Medium: UITableViewDataSource in VC with reloadData — should use DiffableDataSource with a dedicated data source. File should also be flagged if it exceeds 400 lines.",
+      "assertions": [
+        {
+          "id": "AP3.1",
+          "text": "Flags static shared ViewController as Critical — global state, memory leak, multi-window unsafe",
+          "discriminating": true,
+          "rationale": "Singleton VC is a top-severity violation from anti-patterns.md — baseline may miss the multi-window issue"
+        },
+        {
+          "id": "AP3.2",
+          "text": "Flags networking in VC as Critical and VC-to-VC navigation as Critical",
+          "rationale": "Both are top-severity violations — must be in Phase 1/2 refactoring"
+        },
+        {
+          "id": "AP3.3",
+          "text": "Correctly ranks 3 Critical violations before 1 High (no ViewState) and 1 Medium (DiffableDataSource)",
+          "discriminating": true,
+          "rationale": "Severity ranking from anti-patterns.md is skill-specific — baseline often flags all issues equally"
+        },
+        {
+          "id": "AP3.4",
+          "text": "Recommends ViewModel extraction and Coordinator for navigation as the architectural fixes",
+          "rationale": "Concrete fix direction for the critical violations"
+        }
+      ]
+    }
+  ]
+}

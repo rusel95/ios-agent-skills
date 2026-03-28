@@ -1,0 +1,174 @@
+{
+  "model": "gemini-3-1-pro",
+  "skill": "swiftui-mvvm-architecture",
+  "outputs": [
+    {
+      "eval_id": 1,
+      "eval_name": "observable-viewmodel-simple",
+      "prompt": "What's wrong with this ViewModel ownership?\n\n```swift\n@Observable final class FeedViewModel {\n    var posts: [Post] = []\n}\n\nstruct FeedView: View {\n    @StateObject var viewModel = FeedViewModel()\n\n    var body: some View {\n        List(viewModel.posts) { post in Text(post.title) }\n    }\n}\n```",
+      "response_without_skill": "The ownership wrapper is wrong. Because the view creates the `FeedViewModel`, it should not use `@StateObject` here. A plain `@State`-owned model is the right direction for this setup.",
+      "response_with_skill": "`@StateObject` is the wrong ownership wrapper for an `@Observable` type. `@StateObject` belongs to the Combine `ObservableObject` world, so this view should own the model with `@State private var viewModel = FeedViewModel()`. Otherwise the Observation changes from `posts` are not tracked the right way and the view will not update as expected."
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "observable-viewmodel-medium",
+      "prompt": "This subview needs a Binding to the ViewModel's text property. What's the correct property wrapper?\n\n```swift\n@Observable final class FormViewModel {\n    var name: String = \"\"\n    var email: String = \"\"\n}\n\nstruct FormView: View {\n    @State private var viewModel = FormViewModel()\n\n    var body: some View {\n        NameField(viewModel: viewModel)  // needs $viewModel.name\n    }\n}\n\nstruct NameField: View {\n    @ObservedObject var viewModel: FormViewModel  // Correct?\n\n    var body: some View {\n        TextField(\"Name\", text: $viewModel.name)\n    }\n}\n```",
+      "response_without_skill": "`@ObservedObject` is not the right wrapper for this setup. Since the subview receives a model from its parent, either pass the model through more directly or keep the binding focused on the field you need rather than using the Combine-style wrapper.",
+      "response_with_skill": "`@ObservedObject` is wrong here because `FormViewModel` is `@Observable`, not `ObservableObject`. Since this subview needs `$viewModel.name` for `TextField`, the correct wrapper is `@Bindable var viewModel: FormViewModel`. If the subview only needed read access, a plain `let viewModel` would be enough."
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "observable-viewmodel-complex",
+      "prompt": "Identify all issues with this ViewModel and fix them:\n\n```swift\nimport SwiftUI\n\n@Observable class DashboardViewModel {\n    var state: ViewState<[Item]> = .loading\n    var headerColor: Color = .blue\n\n    func load() async {\n        state = .loading\n        do {\n            let items = try await repository.fetchItems()\n            state = .loaded(items)\n        } catch {\n            state = .error(error.localizedDescription)\n        }\n    }\n}\n```",
+      "response_without_skill": "There are a few issues here: the ViewModel should avoid UI-facing values like `Color`, and it should expose platform-neutral data instead. The type should also use the modern `@Observable final class` form rather than a loose base declaration.",
+      "response_with_skill": "This ViewModel has three issues: it imports `SwiftUI` even though a ViewModel should stay platform-agnostic, it stores `Color` which should be exposed as a semantic value such as `headerColorName`, and it is missing the full `@Observable @MainActor final class` declaration so async state mutations are guaranteed to occur on the main actor. The corrected declaration is `@Observable @MainActor final class DashboardViewModel`, with only `Foundation` imported."
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "task-lifecycle-simple",
+      "prompt": "What's wrong with this data loading pattern?\n\n```swift\nstruct ProductListView: View {\n    @State private var viewModel = ProductListViewModel()\n\n    var body: some View {\n        List(viewModel.products) { product in\n            ProductRow(product: product)\n        }\n        .onAppear {\n            Task { await viewModel.loadProducts() }\n        }\n    }\n}\n```",
+      "response_without_skill": "`onAppear { Task { ... } }` is the problem. This is easy to duplicate on repeated appearances and is not the clean SwiftUI lifecycle hook for async loading. Prefer the `.task` modifier for initial loads.",
+      "response_with_skill": "`onAppear { Task { ... } }` is the anti-pattern here. That task is unmanaged and is not cancelled automatically if the view disappears, and `onAppear` also runs every time the view reappears so users can trigger duplicate loads. Replace it with `.task { await viewModel.loadProducts() }`, which is lifecycle-aware and auto-cancelled by SwiftUI."
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "task-lifecycle-medium",
+      "prompt": "Users see a 'Cancelled' error message when quickly switching tabs. Find and fix the bug:\n\n```swift\n@Observable @MainActor final class SearchViewModel {\n    var state: ViewState<[Result]> = .idle\n\n    func search(query: String) async {\n        state = .loading\n        do {\n            let results = try await searchService.search(query: query)\n            state = .loaded(results)\n        } catch {\n            state = .error(error.localizedDescription)  // Shows \"cancelled\"\n        }\n    }\n}\n```",
+      "response_without_skill": "The cancellation is getting surfaced to the user as a real error. When SwiftUI cancels in-flight work because the screen changes, that should not become an error banner. Ignore cancellation instead of mapping it into `.error`.",
+      "response_with_skill": "The bug is that `CancellationError` gets caught by the generic `catch` and then surfaced to the user as an error state. In SwiftUI, `.task` work is cancelled when the view disappears or users switch tabs, so cancellation is expected and should be handled silently. Add `catch is CancellationError { return }` before the generic catch and only map real failures to `.error`."
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "task-lifecycle-complex",
+      "prompt": "The feed doesn't reload when the user changes the filter. Find the issue:\n\n```swift\n@Observable @MainActor final class FeedViewModel {\n    var posts: [Post] = []\n    var selectedFilter: Filter = .all\n\n    func loadFeed() async {\n        do {\n            posts = try await repository.fetchFeed(filter: selectedFilter)\n        } catch is CancellationError {\n            return\n        } catch {\n            // handle error\n        }\n    }\n}\n\nstruct FeedView: View {\n    @State private var viewModel = FeedViewModel()\n\n    var body: some View {\n        VStack {\n            FilterPicker(selection: $viewModel.selectedFilter)\n            PostList(posts: viewModel.posts)\n        }\n        .task { await viewModel.loadFeed() }\n    }\n}\n```",
+      "response_without_skill": "The view only loads once, so changing the filter never triggers a new request. Make the reload logic react to filter changes instead of only running on first appearance.",
+      "response_with_skill": "The feed only loads once because `.task { await viewModel.loadFeed() }` runs on initial appearance but does not react to `selectedFilter` changes. Use `.task(id: viewModel.selectedFilter) { await viewModel.loadFeed() }` so SwiftUI cancels the previous task and launches a new one whenever the filter changes."
+    },
+    {
+      "eval_id": 7,
+      "eval_name": "viewstate-simple",
+      "prompt": "What's the anti-pattern and fix?\n\n```swift\n@Observable @MainActor final class ArticleViewModel {\n    var isLoading = false\n    var articles: [Article] = []\n    var errorMessage: String?\n    var isEmpty = false\n}\n```",
+      "response_without_skill": "The anti-pattern is fragmented state. Independent flags like `isLoading`, `errorMessage`, `articles`, and `isEmpty` can drift into contradictory combinations, so a single enum-based state would be cleaner.",
+      "response_with_skill": "The anti-pattern is separate flags for loading, data, error, and emptiness. Those booleans allow impossible combinations like loading and error at the same time. Replace them with a single `ViewState<[Article]>` enum such as `.loading`, `.loaded([Article])`, `.empty`, and `.error(String)` so one tracked property replaces four inconsistent ones."
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "viewstate-medium",
+      "prompt": "Audit this ViewState rendering for issues:\n\n```swift\nstruct ArticleView: View {\n    @State private var viewModel = ArticleViewModel()\n\n    var body: some View {\n        Group {\n            if viewModel.state == .loading {\n                ProgressView()\n            } else if let articles = (viewModel.state as? ViewState<[Article]>)?.value {\n                List(articles) { article in Text(article.title) }\n            }\n        }\n        .task { await viewModel.load() }\n    }\n}\n```",
+      "response_without_skill": "This should render the enum more directly. Comparing and casting the state is brittle, and the view also fails to handle every possible state, so some outcomes render nothing to the user.",
+      "response_with_skill": "This rendering should use pattern matching, not `==` comparisons and ad-hoc casting. Prefer an exhaustive `switch viewModel.state` or `if case` matching, then handle `.loading`, `.loaded`, `.empty`, and `.error` explicitly. As written, `.empty` and `.error` are missing, so the user just sees a blank screen for those states."
+    },
+    {
+      "eval_id": 9,
+      "eval_name": "viewstate-complex",
+      "prompt": "This ViewModel makes network calls directly and has error handling gaps. Identify all issues:\n\n```swift\n@Observable @MainActor final class ProductViewModel {\n    var state: ViewState<[Product]> = .loading\n\n    func load() async {\n        state = .loading\n        let url = URL(string: \"https://api.example.com/products\")!\n        let (data, _) = try! await URLSession.shared.data(from: url)\n        let products = try! JSONDecoder().decode([Product].self, from: data)\n        state = .loaded(products)\n    }\n}\n```",
+      "response_without_skill": "This ViewModel is doing too much work directly and it also crashes on failures because of `try!`. Move to normal error handling with `do/catch`, and avoid doing raw request construction inline in the state-management code.",
+      "response_with_skill": "There are three issues. The ViewModel performs a direct `URLSession` request instead of calling an injected repository protocol, it uses `try!` for both network and decoding so any failure crashes the app, and it needs explicit cancellation handling so task cancellation returns silently rather than poisoning state or crashing. The ViewModel should call something like `try await repository.fetchProducts()` inside a `do/catch`, map errors into `ViewState.error`, and handle `CancellationError` separately."
+    },
+    {
+      "eval_id": 10,
+      "eval_name": "navigation-simple",
+      "prompt": "What's wrong with this navigation?\n\n```swift\nstruct HomeView: View {\n    @State private var path = NavigationPath()\n\n    var body: some View {\n        NavigationStack(path: $path) {\n            Button(\"Go to detail\") {\n                path.append(\"product-detail\")  // String route\n            }\n            .navigationDestination(for: String.self) { route in\n                if route == \"product-detail\" {\n                    ProductDetailView()\n                }\n            }\n        }\n    }\n}\n```",
+      "response_without_skill": "String routes are fragile because they rely on ad-hoc string matching and are easy to mistype. A typed route model would make the navigation safer and easier to evolve.",
+      "response_with_skill": "String-based routes are the anti-pattern. A typo like `product-detial` compiles and silently breaks navigation, and string routes are poor for state restoration. Define a typed `enum Route: Hashable` with cases such as `.productDetail(productID: UUID)` and switch over that in `.navigationDestination(for: Route.self)`."
+    },
+    {
+      "eval_id": 11,
+      "eval_name": "navigation-medium",
+      "prompt": "What's wrong with this navigation structure?\n\n```swift\nstruct RootView: View {\n    var body: some View {\n        NavigationStack {  // Outer stack\n            TabView {\n                Tab(\"Home\", systemImage: \"house\") {\n                    NavigationStack { HomeView() }   // Inner stack\n                }\n                Tab(\"Profile\", systemImage: \"person\") {\n                    NavigationStack { ProfileView() } // Inner stack\n                }\n            }\n        }\n    }\n}\n```",
+      "response_without_skill": "The navigation structure is overly nested and can produce odd toolbar and back-navigation behavior. Keep the tab navigation structure simpler so each tab owns its own navigation behavior.",
+      "response_with_skill": "The outer `NavigationStack` wrapping the `TabView` is the violation. Each tab should own its own independent navigation stack, which the inner stacks already do. Keeping the outer stack causes duplicate toolbars, broken back-button behavior, and confused navigation state, so remove the outer wrapper and leave the per-tab `NavigationStack`s."
+    },
+    {
+      "eval_id": 12,
+      "eval_name": "navigation-complex",
+      "prompt": "Navigation state is scattered across the ViewModel. What's the correct architecture?\n\n```swift\n@Observable @MainActor final class HomeViewModel {\n    var showProfile = false\n    var showSettings = false\n    var selectedItemID: UUID?\n\n    func openProfile() { showProfile = true }\n    func openSettings() { showSettings = true }\n    func openItem(_ id: UUID) { selectedItemID = id }\n}\n\nstruct HomeView: View {\n    @State private var viewModel = HomeViewModel()\n\n    var body: some View {\n        ContentList()\n            .sheet(isPresented: Binding(\n                get: { viewModel.showProfile },\n                set: { viewModel.showProfile = $0 }\n            )) { ProfileView() }\n    }\n}\n```",
+      "response_without_skill": "The navigation concerns are spread across a few pieces of state in the ViewModel. That is a sign the app needs a more centralized routing approach or some intent callbacks instead of ad-hoc flags.",
+      "response_with_skill": "Navigation state is in the wrong layer. Booleans like `showProfile` and `showSettings` plus `selectedItemID` should not live in the ViewModel. The ViewModel should signal intent through closures such as `onOpenProfile`, while the view owns sheet/navigation `@State`, or you can use a Router `@Observable` object holding a `NavigationPath` at the view layer. In either case, the ViewModel signals where to go and the View or Router decides how to present it."
+    },
+    {
+      "eval_id": 13,
+      "eval_name": "dependency-injection-simple",
+      "prompt": "What's wrong with this ViewModel's dependency access?\n\n```swift\n@Observable @MainActor final class CartViewModel {\n    private(set) var state: ViewState<Cart> = .loading\n\n    func loadCart() async {\n        do {\n            let cart = try await APIService.shared.fetchCart()\n            state = .loaded(cart)\n        } catch is CancellationError {\n            return\n        } catch {\n            state = .error(error.localizedDescription)\n        }\n    }\n}\n```",
+      "response_without_skill": "The ViewModel reaches into a singleton directly, which hides the dependency and hurts testability. Inject the service through the initializer so a mock can be supplied in tests.",
+      "response_with_skill": "`APIService.shared` is a hidden singleton dependency, which makes the ViewModel hard to test because you cannot swap in a mock. Inject a protocol dependency through the initializer, for example `init(service: CartServiceProtocol)`, then pass the real service from the view environment and a mock in tests."
+    },
+    {
+      "eval_id": 14,
+      "eval_name": "dependency-injection-medium",
+      "prompt": "This shared service injection is wrong for @Observable. Fix it:\n\n```swift\n@Observable class AppTheme {\n    var isDarkMode = false\n}\n\n// Root View:\nContentView()\n    .environmentObject(AppTheme())  // Injection\n\n// Child View:\nstruct SettingsView: View {\n    @EnvironmentObject var theme: AppTheme  // Reading\n}\n```",
+      "response_without_skill": "For an `@Observable` theme service, use the newer environment-based injection approach rather than the older object-based pattern. The observation-native environment API is a better fit here.",
+      "response_with_skill": "This injection is wrong for `@Observable`. `@EnvironmentObject` and `.environmentObject` are Combine APIs for `ObservableObject`, not the Observation-native pattern. Inject with `.environment(AppTheme())` and read it with `@Environment(AppTheme.self) var theme`; mixing the old wrappers with `@Observable` can crash at runtime or silently fail to observe updates."
+    },
+    {
+      "eval_id": 15,
+      "eval_name": "dependency-injection-complex",
+      "prompt": "Design the correct DI pattern for a NetworkService shared across 10+ screens using @Observable and @Environment:\n\n```swift\nprotocol NetworkServiceProtocol {\n    func fetch<T: Decodable>(_ url: URL) async throws -> T\n}\n\n// How should this be registered in Environment and consumed by ViewModels?\n```",
+      "response_without_skill": "A shared network service should be registered centrally in the environment and read from views, then passed into ViewModels. That gives you one place to swap implementations, including in tests.",
+      "response_with_skill": "For a shared service across many screens, define a custom environment entry and consume it from views. Use `@Entry` inside `EnvironmentValues` to declare something like `networkService`, override it at the root with `.environment(\\.networkService, LiveNetworkService())`, and read it in a view with `@Environment(\\.networkService)`. That same environment override pattern makes tests easy because you can inject `MockNetworkService()` without changing ViewModel code."
+    },
+    {
+      "eval_id": 16,
+      "eval_name": "testing-simple",
+      "prompt": "This test has a compiler error accessing the ViewModel. What's wrong and how do you fix it?\n\n```swift\nclass ItemViewModelTests: XCTestCase {\n    var sut: ItemViewModel!\n\n    func testInitialStateIsLoading() {\n        sut = ItemViewModel(repository: MockItemRepository())\n        XCTAssertEqual(sut.state, .loading)  // Error: expression is async\n    }\n}\n```",
+      "response_without_skill": "The problem is actor isolation. The ViewModel is isolated to the main actor, so the test needs to run in that same context when it reads `sut.state`.",
+      "response_with_skill": "The compiler is complaining because the ViewModel is `@MainActor`-isolated while the test class is not. Mark the entire test class `@MainActor` so property access such as `sut.state` happens on the same actor as the ViewModel. That is the standard fix for testing `@MainActor` SwiftUI ViewModels."
+    },
+    {
+      "eval_id": 17,
+      "eval_name": "testing-medium",
+      "prompt": "What's missing from this test setup, and how would you test that load() transitions to .loaded?\n\n```swift\n@MainActor\nclass ProductViewModelTests: XCTestCase {\n    var sut: ProductViewModel!\n    var mockRepo: MockProductRepository!\n\n    override func setUp() async throws {\n        mockRepo = MockProductRepository()\n        mockRepo.stubbedProducts = [Product(id: UUID(), name: \"Widget\")]\n        sut = ProductViewModel(repository: mockRepo)\n    }\n\n    override func tearDown() async throws {\n        sut = nil\n        mockRepo = nil\n    }\n}\n```",
+      "response_without_skill": "You can test `load()` directly with `await` and assert on the resulting enum state, rather than reaching for expectations. The setup just needs the usual async-ready test structure around the SUT and mock repository.",
+      "response_with_skill": "Two things are missing. First, add memory leak detection with `addTeardownBlock { [weak sut] in XCTAssertNil(sut) }` right after creating the SUT. Second, because both the test and the ViewModel are `@MainActor`, you can test `load()` with direct `await` and assertions rather than `XCTestExpectation`. After `await sut.load()`, use `if case .loaded(let products) = sut.state` to assert the loaded value."
+    },
+    {
+      "eval_id": 18,
+      "eval_name": "testing-complex",
+      "prompt": "Write the full test structure to verify: (1) CancellationError leaves state unchanged, (2) repository.search was called exactly once, (3) memory is not leaked.\n\n```swift\n@Observable @MainActor final class SearchViewModel {\n    var state: ViewState<[Result]> = .idle\n    private let repository: SearchRepositoryProtocol\n\n    init(repository: SearchRepositoryProtocol) {\n        self.repository = repository\n    }\n\n    func search(query: String) async {\n        state = .loading\n        do {\n            let results = try await repository.search(query: query)\n            state = .loaded(results)\n        } catch is CancellationError {\n            return\n        } catch {\n            state = .error(error.localizedDescription)\n        }\n    }\n}\n```",
+      "response_without_skill": "The test needs an async-capable `@MainActor` test context, a configurable mock repository, and assertions that verify cancellation does not produce an error state while also tracking how many times `search` was invoked.",
+      "response_with_skill": "The full structure should use an `@MainActor` test class, a mock repository with `searchCallCount`, `stubbedResults`, and `shouldThrowCancellation`, plus leak detection through `addTeardownBlock { [weak sut] in XCTAssertNil(sut) }`. In the cancellation test, await `sut.search(query:)`, assert that the state did not become `.error`, and verify `mockRepo.searchCallCount == 1` so the behavior and the call tracking are both covered."
+    },
+    {
+      "eval_id": 19,
+      "eval_name": "performance-simple",
+      "prompt": "How do you diagnose excessive SwiftUI view redraws in an @Observable ViewModel?",
+      "response_without_skill": "Use `Self._printChanges()` in the view body to see what redraws the view, then follow up with Instruments if you need more detail.",
+      "response_with_skill": "Start with `Self._printChanges()` as the first diagnostic tool. Put it at the top of the view body to log every redraw and which tracked value triggered it, then remove it before committing. After that, use the SwiftUI Instruments template if you need quantitative redraw data."
+    },
+    {
+      "eval_id": 20,
+      "eval_name": "performance-medium",
+      "prompt": "Users report the feed is sluggish when typing in the search bar. Self._printChanges() shows FeedView redraws on every keystroke. Find the architectural cause:\n\n```swift\n@Observable @MainActor final class HomeViewModel {\n    var posts: [Post] = []\n    var searchQuery: String = \"\"\n    var isRefreshing: Bool = false\n    var selectedTab: Int = 0\n}\n\nstruct FeedView: View {\n    @Bindable var viewModel: HomeViewModel\n\n    var body: some View {\n        PostList(posts: viewModel.posts)\n        RefreshButton(active: viewModel.isRefreshing)\n    }\n}\n\nstruct SearchBar: View {\n    @Bindable var viewModel: HomeViewModel\n\n    var body: some View {\n        TextField(\"Search\", text: $viewModel.searchQuery)\n    }\n}\n```",
+      "response_without_skill": "The likely architectural cause is that one large `HomeViewModel` is feeding both the feed and the search bar, so the view boundaries are too broad. Check for hidden reads first, and if needed split the responsibilities into smaller focused models.",
+      "response_with_skill": "`@Observable` tracks the properties a view actually reads, so `FeedView` should only care about `posts` and `isRefreshing`, not `searchQuery`. First verify there are no hidden reads of `searchQuery` in the body or computed helpers. If redraws still fan out, the architectural fix is to split the large model into focused `FeedViewModel` and `SearchViewModel` types so typing in the search bar does not touch the feed's observation scope."
+    },
+    {
+      "eval_id": 21,
+      "eval_name": "performance-complex",
+      "prompt": "Every view in the app redraws when anything changes. Find the root cause:\n\n```swift\n@Observable @MainActor final class AppViewModel {\n    var feed: [Post] = []\n    var profile: UserProfile?\n    var cart: Cart?\n    var notifications: [Notification] = []\n    var searchQuery: String = \"\"\n    var isLoggedIn: Bool = false\n    var theme: Theme = .light\n    // 15+ more properties\n}\n\nstruct FeedView: View {\n    @State private var vm = AppViewModel()\n    var body: some View { PostList(posts: vm.feed) }\n}\n\nstruct ProfileView: View {\n    @State private var vm = AppViewModel()\n    var body: some View { ProfileCard(profile: vm.profile) }\n}\n```",
+      "response_without_skill": "The main problem is the giant app-wide ViewModel with too many unrelated properties. That broad surface area causes redraw fallout across features, so the model should be split into smaller feature-scoped pieces.",
+      "response_with_skill": "There are two root causes. First, `AppViewModel` is a God ViewModel with too many unrelated properties, so changes fan out broadly and each feature sees a huge observation surface. Second, each view creates its own `@State private var vm = AppViewModel()`, so they are not sharing state at all. Split this into focused feature ViewModels and inject shared state from a common ancestor or via `@Environment` instead of constructing a fresh app-level model in every screen."
+    },
+    {
+      "eval_id": 22,
+      "eval_name": "anti-patterns-simple",
+      "prompt": "What's the violation and severity?\n\n```swift\n@Observable final class CounterViewModel {\n    var count = 0\n    func increment() { count += 1 }\n}\n\nstruct CounterView: View {\n    @StateObject var viewModel = CounterViewModel()\n\n    var body: some View {\n        Button(\"\\(viewModel.count)\") { viewModel.increment() }\n    }\n}\n```",
+      "response_without_skill": "The violation is using `@StateObject` with an `@Observable` model. The ownership wrapper should match the observation system, so this should be a state-owned model instead.",
+      "response_with_skill": "This is a critical violation: `@StateObject` is being used with an `@Observable` class. `@StateObject` listens to Combine's `objectWillChange`, which `@Observable` does not provide, so the view stops updating when `count` changes. The fix is `@State private var viewModel = CounterViewModel()`."
+    },
+    {
+      "eval_id": 23,
+      "eval_name": "anti-patterns-medium",
+      "prompt": "Code review: rank all violations by severity:\n\n```swift\nstruct CheckoutView: View {\n    @StateObject var viewModel = CheckoutViewModel()  // @Observable class\n\n    var body: some View {\n        VStack {\n            CartSummary(total: viewModel.total)\n            Button(\"Pay\") {\n                Task { await viewModel.processPayment() }\n            }\n        }\n        .onAppear {\n            Task { await viewModel.loadCart() }\n        }\n    }\n}\n\n@Observable @MainActor final class CheckoutViewModel {\n    var isLoading = false\n    var cart: Cart?\n    var error: String?\n}\n```",
+      "response_without_skill": "The most severe issue is the wrong ownership wrapper for the `@Observable` ViewModel. The lifecycle loading hook is also not ideal, and the separate loading and error flags should probably become a single state model.",
+      "response_with_skill": "Ranked by severity: critical, `@StateObject` with an `@Observable` ViewModel breaks observation and must be replaced with `@State`; high, `onAppear { Task { ... } }` creates unmanaged repeated work and should become `.task`; medium, the separate `isLoading`/`cart`/`error` flags should become a single `ViewState<Cart>`. The button-triggered `Task` is acceptable for a short-lived user action, but `processPayment()` still needs proper cancellation handling internally."
+    },
+    {
+      "eval_id": 24,
+      "eval_name": "anti-patterns-complex",
+      "prompt": "Full audit — rank all violations by severity:\n\n```swift\nimport SwiftUI\n\n@Observable class SearchViewModel {\n    var isLoading = false\n    var results: [Product] = []\n    var errorMessage: String?\n    var hostingController: UIViewController?  // Set by UIKit host\n\n    func search(query: String) async {\n        isLoading = true\n        let products = try! await APIService.shared.search(query)\n        results = products\n        isLoading = false\n    }\n}\n\nstruct SearchView: View {\n    var viewModel = SearchViewModel()  // No @State\n\n    var body: some View {\n        List(viewModel.results) { product in\n            Text(product.name)\n        }\n        .onAppear {\n            Task { await viewModel.search(query: \"\") }\n        }\n    }\n}\n```",
+      "response_without_skill": "There are several serious issues here: the ViewModel mixes in platform concerns, the view ownership is unstable, and the loading lifecycle plus error handling are all heavier and riskier than they should be. This needs a more standard SwiftUI MVVM split.",
+      "response_with_skill": "This audit has several layers. The critical issues are `SwiftUI` imported into the ViewModel, a `UIViewController` reference inside the ViewModel, and missing `@MainActor` isolation. The high-severity issues are the view owning the ViewModel as a plain property instead of `@State`, which recreates it on redraw, plus `onAppear { Task {} }` instead of `.task`. Then come the medium issues: `try!` network work, singleton access through `APIService.shared`, and separate boolean/error flags instead of a `ViewState` model."
+    }
+  ]
+}

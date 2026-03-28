@@ -1,0 +1,42 @@
+{
+  "skill_name": "ios-testing",
+  "iteration": 2,
+  "focus": "anti-patterns coverage",
+  "evals": [
+    {
+      "id": 3,
+      "anti_patterns_covered": ["C1", "C3", "H1", "H3", "H5", "H6", "M5", "M6"],
+      "prompt": "Can you audit this test file and tell me everything that's wrong with it?\n\n```swift\nimport XCTest\n@testable import MyApp\n\nclass OrderServiceTests: XCTestCase {\n    static var sut: OrderService!\n    static var mockSession: URLSession!\n\n    override func setUp() {\n        sut = OrderService(session: URLSession.shared)\n    }\n\n    func testFetchOrders() async {\n        let exp = XCTestExpectation(description: \"orders fetched\")\n        sut.fetchOrders { orders in\n            exp.fulfill()\n        }\n        wait(for: [exp], timeout: 5)\n    }\n\n    func testProcessOrder() async {\n        Thread.sleep(forTimeInterval: 0.5)\n        let order = Order(id: UUID(), createdAt: Date(), amount: 99.99)\n        let result = try? sut.process(order)\n        print(\"result: \\(String(describing: result))\")\n    }\n\n    func testOrderIsValid() {\n        let isValid = sut.validate(amount: 10.0)\n        #expect(isValid)\n    }\n}\n```",
+      "expected_output": "Identifies: C1 (wait(for:) in async context deadlock), C3 (URLSession.shared real network), H1 (static var sut shared state), H3 (Thread.sleep), H5 (UUID() and Date() non-deterministic), H6 (missing @MainActor), M5 (sut not nilled in tearDown), M6 (#expect(isValid) pre-evaluated Bool loses expression context). Also notes C2-like issue: testProcessOrder has no assertion, just a print.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "anti_patterns_covered": ["C5", "C6", "C7"],
+      "prompt": "I have three different test situations and all of them seem to silently pass even when the code is broken:\n\n**Situation 1:** I added `@Test` to my Swift Testing suite but accidentally left an old assertion:\n```swift\n@Test func loginSucceeds() {\n    let sut = AuthService()\n    XCTAssertTrue(sut.login(password: \"\")) // empty password should fail!\n}\n```\n\n**Situation 2:** I have an `XCTestCase` subclass and tried Swift Testing macros:\n```swift\nfinal class CartTests: XCTestCase {\n    func testEmptyCart() {\n        let cart = Cart()\n        #expect(cart.total == 999) // obviously wrong but test is green!\n    }\n}\n```\n\n**Situation 3:** I migrated snapshot tests to Swift Testing:\n```swift\n@Test func productCardLooksRight() {\n    let view = ProductCardView(product: .sample)\n    assertSnapshot(of: view, as: .image) // PointFree snapshot library\n    // UI is visually wrong but test is green!\n}\n```\n\nAll three tests are green. What's happening in each case and how do I fix them?",
+      "expected_output": "Identifies all three framework mixing anti-patterns: C5 (XCTAssert in @Test silently passes - no XCTestCase context), C6 (#expect in XCTestCase silently ignored - no Swift Testing context), C7 (assertSnapshot uses XCTAssert under the hood - same as C5). Fixes: use #expect in @Test, use XCTAssert in XCTestCase, keep snapshot tests as XCTestCase until library adds Swift Testing support.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "anti_patterns_covered": ["H7", "H8"],
+      "prompt": "Two strange things happened after we migrated from XCTest to Swift Testing:\n\n**Problem 1:** Each test runs twice in the test report — we see double failures and the run time doubled.\n```swift\nfinal class PaymentTests: XCTestCase {\n    @Test func testChargeCard() { // we added @Test but kept the class and test prefix\n        #expect(PaymentService().charge(amount: 100) == .success)\n    }\n}\n```\n\n**Problem 2:** Tests that ran fine in XCTest parallel mode now have race conditions. We haven't changed the test logic:\n```swift\nstruct NetworkTests {\n    static var mockServer = MockHTTPServer() // shared across all tests\n    \n    @Test func fetchUser() async throws { ... }\n    @Test func fetchOrders() async throws { ... }\n    // These used to work in XCTest parallel but now randomly fail\n}\n```\n\nExplain what changed and how to fix both.",
+      "expected_output": "H7: test prefix + @Test causes double execution — XCTest discovers via prefix, Swift Testing via @Test. Fix: remove test prefix for Swift Testing methods (or remove @Test if keeping XCTestCase). H8: XCTest parallel ran tests in SEPARATE PROCESSES so static state was isolated. Swift Testing runs in ONE PROCESS — all parallel tests share the same static state. Fix: eliminate shared static state or add @Suite(.serialized) temporarily.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "anti_patterns_covered": ["C4", "H5", "M6", "C2"],
+      "prompt": "I have four test quality problems:\n\n**Problem 1** — Tests crash with 'Unexpectedly found nil':\n```swift\nfunc testUserProfile() {\n    let data = try! JSONDecoder().decode(User.self, from: badJSON)\n    XCTAssertEqual(data.name, \"Alice\")\n}\n```\n\n**Problem 2** — CI fails on Monday mornings and passes other times:\n```swift\n@Test func orderExpiresAfter24Hours() {\n    let order = Order(createdAt: Date(), expiresAt: Date().addingTimeInterval(86400))\n    #expect(order.isExpired == false)\n}\n```\n\n**Problem 3** — Failure message is completely useless: 'Expectation failed':\n```swift\n@Test func emailIsValid() {\n    let result = EmailValidator.validate(\"not-an-email\")\n    #expect(result) // should fail but message says nothing\n}\n```\n\n**Problem 4** — This test always passes even when I break the code:\n```swift\n@Test func paymentProcessed() async {\n    let service = PaymentService()\n    await service.processPayment(amount: 100)\n    // no assertion!\n}\n```\n\nWhat's wrong and how do I fix each?",
+      "expected_output": "C4: force-unwrap (try!) crashes instead of failing the test. Fix: try XCTUnwrap() or try #require(). H5: Date() makes test time-dependent and non-repeatable. Fix: inject deterministic date/clock. M6: pre-evaluated Bool loses expression context for #expect. Fix: put full expression inside: #expect(EmailValidator.validate(...) == false). C2: test with no assertions always passes. Fix: add at least one #expect.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "anti_patterns_covered": ["H2", "H4", "M1", "M2", "M3", "M4"],
+      "prompt": "Our test coverage report shows 87% but we keep shipping bugs. Here's a sample of our test file:\n\n```swift\n// CartViewModelTests.swift\nimport XCTest\n@testable import ShopApp\n\nfinal class CartViewModelTests: XCTestCase {\n    \n    func test1() {\n        let vm = CartViewModel()\n        vm.addItem(CartItem(id: \"1\", price: 10))\n        XCTAssertEqual(vm.items.count, 1)\n    }\n    \n    func testX() {\n        let vm = CartViewModel()\n        XCTAssertTrue(vm.calculatePrivateDiscount(amount: 100) > 0)\n    }\n    \n    func testCheckout() {\n        let vm = CartViewModel()\n        vm.addItem(CartItem(id: \"1\", price: 10))\n        let result = vm.checkout()\n        XCTAssertTrue(result)\n        // what if checkout fails? what if cart is empty?\n    }\n    \n    func testFail() {\n        XCTFail()\n    }\n}\n\nstruct MockCart {\n    var items: [CartItem] = []\n}\n```\n\nWhy does high coverage not mean good tests? What specific problems do you see?",
+      "expected_output": "H2: only happy-path tested (checkout has no error/empty-cart/nil tests). H4: testing private method calculatePrivateDiscount directly — tests implementation not behavior. M1: cryptic names (test1, testX) don't describe what's being tested. M2: XCTFail() with no message is useless. M3: MockCart nested in the test file should be in Tests/Mocks/. M4: raw CartItem initializer instead of a test data factory (CartItem.sample()). Coverage metrics lie because coverage only measures which lines were executed, not which behaviors and edge cases were verified.",
+      "files": []
+    }
+  ]
+}

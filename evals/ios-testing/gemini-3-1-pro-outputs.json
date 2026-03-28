@@ -1,0 +1,216 @@
+{
+  "model": "gemini-3-1-pro",
+  "skill": "ios-testing",
+  "outputs": [
+    {
+      "eval_id": 1,
+      "eval_name": "swift-testing-simple",
+      "prompt": "What's the difference between `#expect()` and `try #require()` in Swift Testing?",
+      "response_without_skill": "`#expect()` is a soft assertion: it records the failure and the test continues. `try #require()` is for preconditions; it throws on failure and stops the test path. It also returns the unwrapped value, which makes it useful for optionals you need to use afterward.",
+      "response_with_skill": "`#expect()` is a soft assertion: it records a failure and the test keeps running. `try #require()` is for must-have preconditions; it throws on failure and stops that test path. It also returns the unwrapped value, which is why it is the right tool when you need to unwrap and continue using an optional."
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "swift-testing-medium",
+      "prompt": "I want to test the same login function with 10 different username/password combinations. What's the cleanest way in Swift Testing?",
+      "response_without_skill": "Use a parameterized `@Test` with an `arguments:` collection so one test definition covers all ten username and password combinations. If you want to filter these runs in plans or CI, add tags to the test or suite so the parameterized group can be selected easily.",
+      "response_with_skill": "The cleanest approach is a parameterized `@Test(arguments: ...)` so one test definition covers all ten credential combinations. Use tuples or a small input type for the arguments, and add `.tags(...)` if you want to run or skip that matrix in specific plans. If the inputs come from multiple collections, zip them or build a single array of cases instead of trying to feed multiple unrelated arrays directly."
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "swift-testing-complex",
+      "prompt": "I'm writing Swift Testing tests and some pass when they should fail:\n\n```swift\n@Test func userLoginSucceeds() {\n    let result = AuthService().login(user: \"test\", pass: \"wrong\")\n    XCTAssertTrue(result) // this passes but login should fail!\n}\n```\n\nAlso, I have confirmation() that times out even though the event fires:\n\n```swift\n@Test func notificationReceived() async {\n    await confirmation { confirm in\n        NotificationCenter.default.addObserver(forName: .userLoggedIn, object: nil, queue: nil) { _ in\n            confirm()\n        }\n        AuthService().login() // fires .userLoggedIn\n    }\n}\n```\n\nWhat's wrong with both?",
+      "response_without_skill": "There are two separate issues.\n- `XCTAssertTrue` inside an `@Test` function is a framework-mixing mistake; use `#expect` instead.\n- For the notification case, bridge the callback-style API into async code with a continuation or another awaitable boundary before asserting. The event can fire, but the current structure still does not make the test synchronize with it correctly.",
+      "response_with_skill": "Both failures come from framework semantics.\n- `XCTAssertTrue` inside `@Test` is a framework-mixing error and can pass silently because there is no `XCTestCase` context; replace it with `#expect`.\n- `confirmation()` checks its count when the confirmation closure returns, not when a later callback fires. For callback-based APIs, bridge to async with `withCheckedContinuation` or `withCheckedThrowingContinuation` before asserting. This is the same mixing/coexistence danger the migration guidance warns about."
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "xctest-migration-simple",
+      "prompt": "How do I convert `XCTAssertEqual(a, b)` to Swift Testing?",
+      "response_without_skill": "`XCTAssertEqual(a, b)` becomes `#expect(a == b)` in Swift Testing. That macro also gives better diagnostics because it captures the expression structure and shows the evaluated values in the failure output.",
+      "response_with_skill": "`XCTAssertEqual(a, b)` becomes `#expect(a == b)` in Swift Testing. The macro usually produces better failure output because it preserves the original expression and shows the evaluated values directly in the diagnostic."
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "xctest-migration-medium",
+      "prompt": "I have an XCTest file with setUp(), tearDown(), and XCTestExpectation waits. How do I migrate it to Swift Testing?",
+      "response_without_skill": "Migrate `setUp()` work into stored-property initialization or an initializer, and replace XCTest expectations with async/await or `confirmation()`. During the migration, watch for framework mixing: leaving XCTest assertions inside `@Test` functions is a silent failure mode.",
+      "response_with_skill": "Map `setUp()` work to stored-property initialization or an initializer, and map `tearDown()` cleanup to `deinit` or local `defer` blocks, while remembering that `tearDown()` is not a perfect one-to-one match. Replace XCTest expectations with `confirmation()` or direct async/await depending on the API. During migration, avoid mixing frameworks inside one test function because XCTest assertions in `@Test` are a silent failure mode."
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "xctest-migration-complex",
+      "prompt": "After migrating to Swift Testing, my tests run twice and show double failures. Also tests that passed in XCTest parallel mode now have race conditions:\n\n```swift\nfinal class PaymentTests: XCTestCase {\n    @Test func testChargeCard() { // added @Test\n        #expect(PaymentService().charge(100) == .success)\n    }\n}\n\nstruct NetworkTests {\n    static var mockServer = MockHTTPServer()\n    @Test func fetchUser() async { ... }\n    @Test func fetchOrders() async { ... }\n}\n```",
+      "response_without_skill": "The double run is caused by mixing XCTest discovery and Swift Testing discovery in the same `XCTestCase` method. Remove the `test` prefix or remove `@Test` so the method is discovered only once. The race conditions come from shared state in the migrated suite, so eliminate the static mock server or serialize that suite while you remove the shared mutable state.",
+      "response_with_skill": "There are two separate migration bugs here.\n- `PaymentTests` runs twice because XCTest still discovers `testChargeCard` by prefix while Swift Testing discovers it by `@Test`; remove the `test` prefix or remove `@Test`.\n- The new race conditions appear because XCTest parallelization used separate runner processes, while Swift Testing executes in one process, so shared statics like `mockServer` now collide. Remove the static state or serialize the suite temporarily while you make the state per-test instead."
+    },
+    {
+      "eval_id": 7,
+      "eval_name": "async-testing-simple",
+      "prompt": "My async test hangs forever. What's wrong?\n\n```swift\nfunc testFetch() async {\n    let exp = XCTestExpectation()\n    sut.fetch { exp.fulfill() }\n    wait(for: [exp], timeout: 5)\n}\n```",
+      "response_without_skill": "`wait(for:)` blocks the current thread inside an async test, which can deadlock the work that is supposed to fulfill the expectation. Replace it with `await fulfillment(of: [exp], timeout: 5)` so the test suspends cooperatively instead of blocking.",
+      "response_with_skill": "The hang comes from using `wait(for:)` in an async test. That blocks the current thread and can deadlock the work that needs to fulfill the expectation. Replace it with `await fulfillment(of: [exp], timeout: 5)` so the test suspends cooperatively."
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "async-testing-medium",
+      "prompt": "My test for `isLoading == true` is flaky - sometimes passes, sometimes fails. The ViewModel calls `await repository.fetchItems()`. How do I reliably test the loading state?",
+      "response_without_skill": "The flake is a race. By the time you assert `isLoading == true`, the async fetch may already have finished and flipped the state back. Make the dependency controllable so the request stays in flight while you assert the loading state, and avoid using `Task.sleep` as the main fix because it just hides timing issues.",
+      "response_with_skill": "This is a race on intermediate state. By the time the test checks `isLoading`, `fetchItems()` may already have returned. The deterministic fix is to wrap the test in `withMainSerialExecutor` and make the mock repository suspend with `Task.yield()` so execution pauses while `isLoading` is true. Do not use `Task.sleep` as the primary fix; it just papers over timing issues."
+    },
+    {
+      "eval_id": 9,
+      "eval_name": "async-testing-complex",
+      "prompt": "I have a ViewModel that creates an internal Task {} when loadData() is called. The Task updates @Published properties. My test completes before the Task finishes:\n\n```swift\nclass ProfileViewModel: ObservableObject {\n    @Published var user: User?\n    func loadData() {\n        Task {\n            user = await repository.fetchUser()\n        }\n    }\n}\n\nfunc testLoadData() async {\n    let vm = ProfileViewModel(repository: mockRepo)\n    vm.loadData()\n    XCTAssertNotNil(vm.user) // fails - Task not finished\n}\n```\n\nHow do I fix this without changing production code?",
+      "response_without_skill": "`loadData()` launches a fire-and-forget `Task`, so the test has nothing it can directly await. The usual fix is to subscribe to `$user.dropFirst()` before calling `loadData()`, fulfill an expectation from the sink, and wait for that emission. If you can change the design later, making `loadData()` async or injecting task creation would make this much easier to test.",
+      "response_with_skill": "`loadData()` creates an internal fire-and-forget `Task`, so the test cannot await it directly. In XCTest, subscribe to `$user.dropFirst()` before calling `loadData()`, fulfill an expectation from the sink, and `await fulfillment(of:)` for the published change. For deterministic scheduling without changing production code, wrap the test in `withMainSerialExecutor` and make the mock suspend so the spawned task yields. Long term, a cleaner design is to make `loadData()` async or inject task creation."
+    },
+    {
+      "eval_id": 10,
+      "eval_name": "observable-testing-simple",
+      "prompt": "How do I test an @Observable ViewModel's state changes in Swift Testing?",
+      "response_without_skill": "For synchronous `@Observable` changes, direct assertions are enough. For async changes, use observation-based tooling such as `withObservationTracking` or an async confirmation pattern. If the view model is `@MainActor`, the test type should also be `@MainActor`.",
+      "response_with_skill": "For synchronous `@Observable` changes, direct assertions are enough. For async changes, use `withObservationTracking` or an async confirmation-style pattern to observe the mutation. If the view model is `@MainActor`, put `@MainActor` on the test type as well so construction and assertions happen in the correct isolation domain."
+    },
+    {
+      "eval_id": 11,
+      "eval_name": "observable-testing-medium",
+      "prompt": "My @Observable ViewModel test fails with isolation errors:\n\n```swift\n@Observable @MainActor\nclass CartViewModel {\n    var total: Decimal = 0\n    func addItem(_ item: Item) { total += item.price }\n}\n\n@Test func cartAddsItem() {\n    let vm = CartViewModel()\n    vm.addItem(Item(price: 10))\n    #expect(vm.total == 10)\n}\n```\n\nError: \"Call to main actor-isolated initializer 'init()' in a synchronous nonisolated context\"",
+      "response_without_skill": "The test itself is not isolated to the main actor. Add `@MainActor` to the test type so constructing and using `CartViewModel` happens in the right context, for example with an `@Suite`-annotated `@MainActor` test struct.",
+      "response_with_skill": "The error is because the test is nonisolated while `CartViewModel` is main-actor isolated. Put `@MainActor` on the test type, for example `@Suite(\"CartViewModel\") @MainActor struct CartViewModelTests { ... }`. If you cannot restructure immediately, `await MainActor.run { ... }` is a temporary workaround, but the cleaner fix is actor-isolating the whole test suite."
+    },
+    {
+      "eval_id": 12,
+      "eval_name": "observable-testing-complex",
+      "prompt": "I need to test that my @Observable ViewModel publishes exactly 3 state changes when loading data (idle -> loading -> success). How do I count and verify the state transitions?\n\n```swift\n@Observable @MainActor\nclass DataViewModel {\n    enum State { case idle, loading, success, error }\n    var state: State = .idle\n    \n    func load() async {\n        state = .loading\n        do {\n            _ = try await repository.fetch()\n            state = .success\n        } catch {\n            state = .error\n        }\n    }\n}\n```",
+      "response_without_skill": "To verify multiple transitions, register observation repeatedly and record each state as it changes. Because observation callbacks use `willSet` semantics, assert the new value after the change has completed rather than reading it inside the callback. Also make the mock suspend so the test can observe the intermediate loading state instead of racing straight to completion.",
+      "response_with_skill": "To verify `idle -> loading -> success`, use `withObservationTracking` and re-register observation after each change because a single registration only fires once. Remember that observation callbacks use `willSet`, so the new value is not readable inside the callback itself; capture the event there and assert after the mutation completes. Another option is an async confirmation pattern with `expectedCount: 3`. Make the mock suspend or yield so the test can reliably observe the intermediate loading state rather than racing straight to success."
+    },
+    {
+      "eval_id": 13,
+      "eval_name": "tca-testing-simple",
+      "prompt": "What's a TestStore in TCA and why should I use it?",
+      "response_without_skill": "`TestStore` is TCA's reducer test harness. You send actions into the reducer, assert the resulting state mutations, and verify every effect action that comes back. It also lets you override dependencies so reducer tests stay isolated and deterministic.",
+      "response_with_skill": "`TestStore` is TCA's reducer test harness. You send actions, assert the resulting state mutations, receive effect-generated actions, and override dependencies so the reducer runs in a fully isolated and deterministic environment."
+    },
+    {
+      "eval_id": 14,
+      "eval_name": "tca-testing-medium",
+      "prompt": "My TCA test fails with 'received more actions than expected'. I only sent one action but effects are firing more:\n\n```swift\n@Test func loginSendsRequest() async {\n    let store = TestStore(initialState: LoginFeature.State()) {\n        LoginFeature()\n    }\n    await store.send(.loginTapped) {\n        $0.isLoading = true\n    }\n    // Error: received .loginResponse but didn't assert it\n}\n```",
+      "response_without_skill": "`TestStore` is exhaustive by default. If an effect sends `.loginResponse`, the test must assert that with `await store.receive(...)`; otherwise TCA reports unhandled actions. In other words, sending `.loginTapped` is only the first half of the interaction. If you need a looser integration-style test, you can also relax exhaustivity instead of asserting every internal step.",
+      "response_with_skill": "`TestStore` is exhaustive by default, so any effect action it receives must be asserted explicitly. After `await store.send(.loginTapped) { $0.isLoading = true }`, you also need `await store.receive(\\.loginResponse) { ... }`; modern TCA prefers the case-key-path form rather than a full enum value. If you are intentionally doing broader integration-style testing, you can switch `store.exhaustivity = .off`, but exhaustive mode is the default and usually the safer choice."
+    },
+    {
+      "eval_id": 15,
+      "eval_name": "tca-testing-complex",
+      "prompt": "My TCA feature has a timer that fires every second. Tests are flaky because real time passes. Also, my @Test functions don't fail when TestStore assertions fail - they just pass silently.\n\n```swift\n@Reducer struct TimerFeature {\n    @Dependency(\\.continuousClock) var clock\n    var body: some ReducerOf<Self> {\n        Reduce { state, action in\n            switch action {\n            case .startTimer:\n                return .run { send in\n                    for await _ in clock.timer(interval: .seconds(1)) {\n                        await send(.tick)\n                    }\n                }\n            case .tick:\n                state.count += 1\n                return .none\n            }\n        }\n    }\n}\n```",
+      "response_without_skill": "Do not let real time drive this test. Inject a `TestClock`, override the reducer's clock dependency with it, and advance the clock manually so ticks happen deterministically. If you advance by three seconds, you should assert the three `.tick` actions that come back from the effect.",
+      "response_with_skill": "Do not use real time here. Inject a `TestClock`, override `continuousClock` in the store dependencies, and advance it manually so timer events are deterministic. For example, `await testClock.advance(by: .seconds(3))` should drive three ticks that you then assert. If `TestStore` failures are passing silently inside `@Test`, make sure the project is on TCA 1.12 or newer, because earlier versions had a Swift Testing compatibility bug."
+    },
+    {
+      "eval_id": 16,
+      "eval_name": "ui-testing-simple",
+      "prompt": "How do I wait for a button to appear in XCUITest?",
+      "response_without_skill": "Use `waitForExistence(timeout:)` on the button before tapping it, for example `button.waitForExistence(timeout: 5)`. That gives the UI time to appear instead of assuming it is already on screen.",
+      "response_with_skill": "Use `waitForExistence(timeout:)` on the button before interacting with it, for example `XCTAssertTrue(button.waitForExistence(timeout: 5))`. That is the standard way to wait for UI elements to appear in XCUITest."
+    },
+    {
+      "eval_id": 17,
+      "eval_name": "ui-testing-medium",
+      "prompt": "My XCUITest is flaky because a system alert for location permission blocks the flow. How do I handle system alerts?",
+      "response_without_skill": "Register an `addUIInterruptionMonitor` for the system alert and then interact with the app again so iOS actually delivers the alert to that monitor. Without the extra tap, the handler often never runs.",
+      "response_with_skill": "Use `addUIInterruptionMonitor` to handle the permission alert, and remember that the monitor is not triggered until you interact with the app again, typically with `app.tap()`. If you want to avoid the alert entirely in some runs, another option is to control permissions through pre-launch configuration such as launch arguments or environment-backed reset/setup hooks."
+    },
+    {
+      "eval_id": 18,
+      "eval_name": "ui-testing-complex",
+      "prompt": "Our XCUITest suite has 200 tests and takes 45 minutes. Tests are brittle - small UI changes break many tests. How do we improve maintainability and speed?",
+      "response_without_skill": "Two improvements matter most here:\n- Use a Page Object Model and accessibility identifiers so individual UI changes do not force search-and-replace across hundreds of tests.\n- Parallelize the suite where possible, and keep the UI layer thin by moving business logic checks down into unit tests instead of asserting everything through XCUITest.",
+      "response_with_skill": "Make the suite smaller and more maintainable:\n- Encapsulate screens with a Page Object Model.\n- Drive element lookup from accessibility identifiers instead of visible strings.\n- Run the UI suite in parallel via Test Plans where safe.\n- Reduce the total UI surface area by pushing logic checks into unit tests.\n- Use launch arguments and environment to disable animations and pre-seed app state so flows do not spend time navigating boilerplate setup."
+    },
+    {
+      "eval_id": 19,
+      "eval_name": "snapshot-testing-simple",
+      "prompt": "How do I set up snapshot testing for SwiftUI views?",
+      "response_without_skill": "Use Point-Free's `swift-snapshot-testing` package, render the view through a supported snapshot strategy such as `.image`, and let the first run record the reference image. Later runs compare against that stored snapshot and fail on differences.",
+      "response_with_skill": "Use Point-Free's `swift-snapshot-testing` library, snapshot the view with `assertSnapshot(of: viewOrHost, as: .image(...))`, and let the first run record the reference artifact. Subsequent runs compare against that stored snapshot and fail when the rendered output changes."
+    },
+    {
+      "eval_id": 20,
+      "eval_name": "snapshot-testing-medium",
+      "prompt": "My snapshot tests pass locally but fail on CI with tiny pixel differences. How do I fix this?",
+      "response_without_skill": "Pin the snapshot to a specific device or layout so CI and local runs render the same way, and loosen precision slightly to absorb tiny anti-aliasing differences. Also standardize where snapshots are recorded versus only compared so developers and CI are not using different rules.",
+      "response_with_skill": "Pin the snapshot to a specific device or layout so rendering is deterministic, and use precision settings such as `precision: 0.99` to reduce tiny anti-aliasing failures on CI. Also make one environment authoritative for recording and the other compare-only; the usual rule is local `.missing` and CI `.never`, not ad hoc recording in both places."
+    },
+    {
+      "eval_id": 21,
+      "eval_name": "snapshot-testing-complex",
+      "prompt": "We migrated snapshot tests to Swift Testing but they silently pass even when UI is wrong:\n\n```swift\n@Test func productCardLooksRight() {\n    let view = ProductCardView(product: .sample)\n    assertSnapshot(of: view, as: .image)\n}\n```\n\nAlso, we want to test both light and dark mode but don't want to duplicate every test.",
+      "response_without_skill": "The safe move is to keep these tests in `XCTestCase` instead of `@Test`, because snapshot libraries are still built around XCTest-style execution. For light and dark mode, run the same snapshot over a small configuration matrix and name each variant so the reference files do not overwrite one another, for example by setting dark traits explicitly for the dark case.",
+      "response_with_skill": "The silent pass happens because `assertSnapshot` is still XCTest-based and uses `XCTAssert` under the hood, which is the same framework-mixing hazard as any other XCTest assertion inside `@Test`. Keep snapshot tests in `XCTestCase` until the library offers real Swift Testing support. For light and dark mode, run a small configuration matrix and name each variant, for example by using `.image(traits: .init(userInterfaceStyle: .dark))` or an equivalent named dark-mode strategy so the references stay distinct."
+    },
+    {
+      "eval_id": 22,
+      "eval_name": "integration-testing-simple",
+      "prompt": "How do I test network code without hitting real servers?",
+      "response_without_skill": "Use a `URLProtocol` subclass to intercept requests and return canned responses, or inject a mock networking/session dependency so the code never hits a real server during tests.",
+      "response_with_skill": "Use a `URLProtocol` subclass to intercept requests and return test responses, or inject a mock `URLSession`-style dependency so the networking layer never reaches a real server in unit or integration tests."
+    },
+    {
+      "eval_id": 23,
+      "eval_name": "integration-testing-medium",
+      "prompt": "My Core Data tests are slow and sometimes fail with 'store already in use'. How do I isolate Core Data in tests?",
+      "response_without_skill": "Create a fresh Core Data stack for each test and keep it in-memory so tests do not contend for the same SQLite file. The important part is isolating the container per test case rather than reusing one shared store.",
+      "response_with_skill": "Use a fresh Core Data container per test and isolate the store. The recommended setup is an `NSPersistentStoreDescription` whose URL points at `/dev/null`, which behaves more like SQLite than `NSInMemoryStoreType` while still avoiding persistent files. Rebuilding the container per test prevents `store already in use` collisions."
+    },
+    {
+      "eval_id": 24,
+      "eval_name": "integration-testing-complex",
+      "prompt": "Our app stores auth tokens in Keychain. Tests randomly fail because Keychain state persists between test runs. We also have UserDefaults and SwiftData. How do we fully isolate each test?",
+      "response_without_skill": "Treat every storage system as an injected dependency.\n- Wrap Keychain behind a protocol and use an in-memory mock, or at least isolate it with unique test configuration.\n- Use a unique `UserDefaults(suiteName:)` domain per test and clear it in teardown.\n- Configure SwiftData with an in-memory store.\n- Avoid direct global access to storage APIs from production types so tests can swap them cleanly.",
+      "response_with_skill": "Fully isolate each persistence dependency:\n- Keychain should sit behind a protocol wrapper with an in-memory mock, or use a unique service/account namespace per test if you must hit the real API.\n- UserDefaults should use a unique `suiteName` per test and remove the persistent domain in setup and teardown.\n- SwiftData should use an in-memory `ModelConfiguration`.\n- Inject all of these stores instead of reading them directly from global APIs.\n- If you exercise the real Keychain on Simulator, remember that entries can persist across app reinstalls, so manual cleanup may still be required."
+    },
+    {
+      "eval_id": 25,
+      "eval_name": "anti-patterns-simple",
+      "prompt": "What's wrong with this test?\n\n```swift\nfunc testOrder() {\n    let order = Order(createdAt: Date())\n    XCTAssertFalse(order.isExpired)\n}\n```",
+      "response_without_skill": "The issue is determinism. `Date()` makes the test non-repeatable, so it can flip around midnight, DST boundaries, or any logic tied to the current clock. Inject a fixed date or a clock dependency so the test always runs against known time input.",
+      "response_with_skill": "The test is non-repeatable because it depends on the real clock. `Date()` can make `isExpired` flip at midnight, across DST, or whenever the current time crosses the expiry boundary. Inject a fixed date or a clock dependency so the test uses deterministic input."
+    },
+    {
+      "eval_id": 26,
+      "eval_name": "anti-patterns-medium",
+      "prompt": "This test passes but coverage shows the async code path wasn't executed:\n\n```swift\n@Test func dataLoads() async {\n    let vm = DataViewModel()\n    await vm.loadData()\n}\n```\n\nWhat's the problem?",
+      "response_without_skill": "The test proves only that `loadData()` returned; it never checks the result. A Swift Testing test with no `#expect` still passes, and code coverage only shows execution, not correctness. Add assertions for the observable state or returned data so the async path is actually validated.",
+      "response_with_skill": "The test has no assertion, so it will pass even if `loadData()` does nothing useful. This is the same anti-pattern as a no-assertion test: coverage only proves the line executed, not that the async path produced the correct state or output. Add `#expect` checks for the postconditions you care about."
+    },
+    {
+      "eval_id": 27,
+      "eval_name": "anti-patterns-complex",
+      "prompt": "Audit this test file and list everything wrong:\n\n```swift\nimport XCTest\n@testable import MyApp\n\nclass OrderTests: XCTestCase {\n    static var sut: OrderService!\n    \n    func testFetch() async {\n        let exp = XCTestExpectation()\n        sut.fetch { exp.fulfill() }\n        wait(for: [exp], timeout: 5)\n    }\n    \n    func testProcess() {\n        Thread.sleep(forTimeInterval: 0.5)\n        let result = sut.process(Order(id: UUID()))\n        print(result)\n    }\n    \n    func testValidate() {\n        let isValid = sut.validate(10)\n        #expect(isValid)\n    }\n}\n```",
+      "response_without_skill": "This file has several problems:\n- `static var sut` shares state across tests.\n- `wait(for:)` inside an async test can deadlock; use `await fulfillment(of:)` instead.\n- `Thread.sleep` adds an artificial delay and makes the suite slower and flakier.\n- `UUID()` makes the test input nondeterministic.\n- `print(result)` is not an assertion, so the test does not validate behavior.\n- `sut` is never initialized in `setUp`, so the suite can crash before it even tests anything.",
+      "response_with_skill": "This file is broken in multiple ways:\n- `static var sut` shares mutable state across tests.\n- `wait(for:)` inside an async test can deadlock; use `await fulfillment(of:)`.\n- `Thread.sleep` is an artificial delay that slows and destabilizes the suite.\n- `UUID()` makes the input nondeterministic.\n- `print(result)` is not validation.\n- `#expect` inside an `XCTestCase` method is ignored, so that assertion is effectively silent.\n- `sut` is never initialized in setup, so the suite can crash before any behavior is tested."
+    },
+    {
+      "eval_id": 28,
+      "eval_name": "test-organization-simple",
+      "prompt": "What's a good naming convention for test methods?",
+      "response_without_skill": "Use a structured pattern like `test_<method>_<condition>_<expected>` in XCTest, or descriptive `@Test(\"does X when Y\")` names in Swift Testing. The key is that the name states the behavior, condition, and expected outcome clearly.",
+      "response_with_skill": "Use a structured name like `test_<method>_<condition>_<expected>` for XCTest, or a descriptive Swift Testing label such as `@Test(\"does X when Y\")`. The important part is that the name clearly states behavior, context, and expected result."
+    },
+    {
+      "eval_id": 29,
+      "eval_name": "test-organization-medium",
+      "prompt": "Our test suite takes 15 minutes. How do we speed it up?",
+      "response_without_skill": "Start by parallelizing what can safely run in parallel and by identifying the truly slow tests from timing data. If integration tests are mixed into the main unit suite, move them into a separate scheme or plan, and push more coverage down into fast unit tests so the suite follows the test pyramid instead of leaning on expensive UI or integration cases.",
+      "response_with_skill": "Speed this up in layers: parallelize eligible tests, profile and fix the slowest cases, move heavier integration tests into a separate scheme or Test Plan, and push the suite back toward the test pyramid so most coverage comes from fast unit tests rather than long-running UI or integration checks."
+    },
+    {
+      "eval_id": 30,
+      "eval_name": "test-organization-complex",
+      "prompt": "We have flaky tests that randomly fail on CI but pass locally. They're blocking PRs. How do we handle them without just deleting them?",
+      "response_without_skill": "Do not delete flaky tests just to unblock CI. Track them explicitly, file work items for root-cause fixes, and investigate the usual causes such as shared state, timing assumptions, or CI-only environment differences. As a temporary stabilizer for Swift Testing suites, serializing a problematic suite can reduce parallel-execution races while the underlying issue is being fixed.",
+      "response_with_skill": "Handle flaky tests with policy rather than deletion. Put them in a quarantine Test Plan, keep running them so data still comes in, but stop letting that quarantined plan block PRs while the fix is in progress. Track each flaky test with an owner and ticket, time-box the repair work, and investigate root causes such as shared state, timing assumptions, or CI environment drift. For Swift Testing-specific parallel issues, `@Suite(.serialized)` is a reasonable temporary stabilizer, not the long-term fix."
+    }
+  ]
+}

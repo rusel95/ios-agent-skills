@@ -1,0 +1,395 @@
+{
+  "skill_name": "ios-testing",
+  "methodology": "10 topics × 3 difficulty tiers = 30 evals",
+  "topics": [
+    "swift-testing-framework",
+    "xctest-migration",
+    "async-testing",
+    "observable-testing",
+    "tca-testing",
+    "ui-testing",
+    "snapshot-testing",
+    "integration-testing",
+    "anti-patterns",
+    "test-organization"
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "name": "swift-testing-simple",
+      "topic": "swift-testing-framework",
+      "difficulty": "simple",
+      "prompt": "What's the difference between `#expect()` and `try #require()` in Swift Testing?",
+      "assertions": [
+        {"id": "S1.1", "text": "Explains #expect is soft check (continues on failure)", "discriminating": false},
+        {"id": "S1.2", "text": "Explains #require halts test on failure", "discriminating": false},
+        {"id": "S1.3", "text": "Shows #require returns unwrapped value", "discriminating": true}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "swift-testing-medium",
+      "topic": "swift-testing-framework",
+      "difficulty": "medium",
+      "prompt": "I want to test the same login function with 10 different username/password combinations. What's the cleanest way in Swift Testing?",
+      "assertions": [
+        {"id": "S2.1", "text": "Recommends @Test with arguments parameter", "discriminating": false},
+        {"id": "S2.2", "text": "Shows parameterized test syntax with tuple or custom type", "discriminating": false},
+        {"id": "S2.3", "text": "Mentions .tags for filtering test subsets", "discriminating": true},
+        {"id": "S2.4", "text": "Warns about argument count limits or shows zip() for multiple collections", "discriminating": true}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "swift-testing-complex",
+      "topic": "swift-testing-framework",
+      "difficulty": "complex",
+      "prompt": "I'm writing Swift Testing tests and some pass when they should fail:\n\n```swift\n@Test func userLoginSucceeds() {\n    let result = AuthService().login(user: \"test\", pass: \"wrong\")\n    XCTAssertTrue(result) // this passes but login should fail!\n}\n```\n\nAlso, I have confirmation() that times out even though the event fires:\n\n```swift\n@Test func notificationReceived() async {\n    await confirmation { confirm in\n        NotificationCenter.default.addObserver(forName: .userLoggedIn, object: nil, queue: nil) { _ in\n            confirm()\n        }\n        AuthService().login() // fires .userLoggedIn\n    }\n}\n```\n\nWhat's wrong with both?",
+      "assertions": [
+        {"id": "S3.1", "text": "Identifies XCTAssert in @Test silently passes (no XCTestCase context)", "discriminating": false},
+        {"id": "S3.2", "text": "Explains confirmation() counts when CLOSURE RETURNS, not when callback fires", "discriminating": true},
+        {"id": "S3.3", "text": "Shows fix: use #expect for assertions, withCheckedContinuation for callbacks", "discriminating": false},
+        {"id": "S3.4", "text": "Mentions this is anti-pattern C5 or references framework mixing danger", "discriminating": true}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "xctest-migration-simple",
+      "topic": "xctest-migration",
+      "difficulty": "simple",
+      "prompt": "How do I convert `XCTAssertEqual(a, b)` to Swift Testing?",
+      "assertions": [
+        {"id": "M1.1", "text": "Shows #expect(a == b) syntax", "discriminating": false},
+        {"id": "M1.2", "text": "Mentions Swift Testing provides better failure messages with expression context", "discriminating": true}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "xctest-migration-medium",
+      "topic": "xctest-migration",
+      "difficulty": "medium",
+      "prompt": "I have an XCTest file with setUp(), tearDown(), and XCTestExpectation waits. How do I migrate it to Swift Testing?",
+      "assertions": [
+        {"id": "M2.1", "text": "setUp -> stored property initialization or init", "discriminating": false},
+        {"id": "M2.2", "text": "tearDown -> deinit (but warns tearDown is not exactly equivalent)", "discriminating": true},
+        {"id": "M2.3", "text": "XCTestExpectation -> confirmation() or async/await", "discriminating": false},
+        {"id": "M2.4", "text": "Warns about framework mixing danger during migration", "discriminating": true}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "xctest-migration-complex",
+      "topic": "xctest-migration",
+      "difficulty": "complex",
+      "prompt": "After migrating to Swift Testing, my tests run twice and show double failures. Also tests that passed in XCTest parallel mode now have race conditions:\n\n```swift\nfinal class PaymentTests: XCTestCase {\n    @Test func testChargeCard() { // added @Test\n        #expect(PaymentService().charge(100) == .success)\n    }\n}\n\nstruct NetworkTests {\n    static var mockServer = MockHTTPServer()\n    @Test func fetchUser() async { ... }\n    @Test func fetchOrders() async { ... }\n}\n```",
+      "assertions": [
+        {"id": "M3.1", "text": "Identifies test prefix + @Test causes double execution (XCTest discovers via prefix, Swift Testing via @Test)", "discriminating": true},
+        {"id": "M3.2", "text": "Explains XCTest parallel ran in SEPARATE PROCESSES, Swift Testing runs in ONE PROCESS", "discriminating": true},
+        {"id": "M3.3", "text": "Fix for double: remove test prefix or remove @Test", "discriminating": false},
+        {"id": "M3.4", "text": "Fix for races: eliminate static state or @Suite(.serialized)", "discriminating": false}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "async-testing-simple",
+      "topic": "async-testing",
+      "difficulty": "simple",
+      "prompt": "My async test hangs forever. What's wrong?\n\n```swift\nfunc testFetch() async {\n    let exp = XCTestExpectation()\n    sut.fetch { exp.fulfill() }\n    wait(for: [exp], timeout: 5)\n}\n```",
+      "assertions": [
+        {"id": "A1.1", "text": "Identifies wait(for:) blocks thread in async context causing deadlock", "discriminating": false},
+        {"id": "A1.2", "text": "Shows fix: await fulfillment(of:) instead of wait(for:)", "discriminating": false}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "async-testing-medium",
+      "topic": "async-testing",
+      "difficulty": "medium",
+      "prompt": "My test for `isLoading == true` is flaky - sometimes passes, sometimes fails. The ViewModel calls `await repository.fetchItems()`. How do I reliably test the loading state?",
+      "assertions": [
+        {"id": "A2.1", "text": "Identifies race condition: async completes before assertion runs", "discriminating": false},
+        {"id": "A2.2", "text": "Recommends withMainSerialExecutor from swift-concurrency-extras", "discriminating": true},
+        {"id": "A2.3", "text": "Explains Task.yield() inside mock for deterministic suspension", "discriminating": true},
+        {"id": "A2.4", "text": "Does NOT recommend Task.sleep as primary solution", "discriminating": false}
+      ]
+    },
+    {
+      "id": 9,
+      "name": "async-testing-complex",
+      "topic": "async-testing",
+      "difficulty": "complex",
+      "prompt": "I have a ViewModel that creates an internal Task {} when loadData() is called. The Task updates @Published properties. My test completes before the Task finishes:\n\n```swift\nclass ProfileViewModel: ObservableObject {\n    @Published var user: User?\n    func loadData() {\n        Task {\n            user = await repository.fetchUser()\n        }\n    }\n}\n\nfunc testLoadData() async {\n    let vm = ProfileViewModel(repository: mockRepo)\n    vm.loadData()\n    XCTAssertNotNil(vm.user) // fails - Task not finished\n}\n```\n\nHow do I fix this without changing production code?",
+      "assertions": [
+        {"id": "A3.1", "text": "Explains internal Task is fire-and-forget, test can't await it", "discriminating": false},
+        {"id": "A3.2", "text": "Option: use expectation + sink on @Published with dropFirst()", "discriminating": false},
+        {"id": "A3.3", "text": "Option: withMainSerialExecutor to serialize Task execution", "discriminating": true},
+        {"id": "A3.4", "text": "Mentions refactoring option: inject Task or make loadData() async", "discriminating": false},
+        {"id": "A3.5", "text": "Warns about dropFirst() - subscribe BEFORE calling loadData()", "discriminating": true}
+      ]
+    },
+    {
+      "id": 10,
+      "name": "observable-testing-simple",
+      "topic": "observable-testing",
+      "difficulty": "simple",
+      "prompt": "How do I test an @Observable ViewModel's state changes in Swift Testing?",
+      "assertions": [
+        {"id": "O1.1", "text": "For sync changes: direct assertion works", "discriminating": false},
+        {"id": "O1.2", "text": "For async changes: withObservationTracking or confirmation", "discriminating": false},
+        {"id": "O1.3", "text": "Test type needs @MainActor when ViewModel is @MainActor", "discriminating": true}
+      ]
+    },
+    {
+      "id": 11,
+      "name": "observable-testing-medium",
+      "topic": "observable-testing",
+      "difficulty": "medium",
+      "prompt": "My @Observable ViewModel test fails with isolation errors:\n\n```swift\n@Observable @MainActor\nclass CartViewModel {\n    var total: Decimal = 0\n    func addItem(_ item: Item) { total += item.price }\n}\n\n@Test func cartAddsItem() {\n    let vm = CartViewModel()\n    vm.addItem(Item(price: 10))\n    #expect(vm.total == 10)\n}\n```\n\nError: \"Call to main actor-isolated initializer 'init()' in a synchronous nonisolated context\"",
+      "assertions": [
+        {"id": "O2.1", "text": "Add @MainActor to the test struct/class, not just the method", "discriminating": false},
+        {"id": "O2.2", "text": "Shows @Suite @MainActor struct CartViewModelTests syntax", "discriminating": false},
+        {"id": "O2.3", "text": "Alternative: await MainActor.run {} as workaround", "discriminating": true}
+      ]
+    },
+    {
+      "id": 12,
+      "name": "observable-testing-complex",
+      "topic": "observable-testing",
+      "difficulty": "complex",
+      "prompt": "I need to test that my @Observable ViewModel publishes exactly 3 state changes when loading data (idle -> loading -> success). How do I count and verify the state transitions?\n\n```swift\n@Observable @MainActor\nclass DataViewModel {\n    enum State { case idle, loading, success, error }\n    var state: State = .idle\n    \n    func load() async {\n        state = .loading\n        do {\n            _ = try await repository.fetch()\n            state = .success\n        } catch {\n            state = .error\n        }\n    }\n}\n```",
+      "assertions": [
+        {"id": "O3.1", "text": "Uses withObservationTracking in a loop or multiple times", "discriminating": false},
+        {"id": "O3.2", "text": "Explains willSet semantics - tracking sees value BEFORE change", "discriminating": true},
+        {"id": "O3.3", "text": "Alternative: confirmation(expectedCount: 3) with observation", "discriminating": true},
+        {"id": "O3.4", "text": "Addresses timing: mock should yield to allow state assertions", "discriminating": true}
+      ]
+    },
+    {
+      "id": 13,
+      "name": "tca-testing-simple",
+      "topic": "tca-testing",
+      "difficulty": "simple",
+      "prompt": "What's a TestStore in TCA and why should I use it?",
+      "assertions": [
+        {"id": "T1.1", "text": "TestStore tests reducers by sending actions and asserting state changes", "discriminating": false},
+        {"id": "T1.2", "text": "Provides exhaustive assertion - must assert ALL state changes and effects", "discriminating": false},
+        {"id": "T1.3", "text": "Allows dependency overriding for isolation", "discriminating": false}
+      ]
+    },
+    {
+      "id": 14,
+      "name": "tca-testing-medium",
+      "topic": "tca-testing",
+      "difficulty": "medium",
+      "prompt": "My TCA test fails with 'received more actions than expected'. I only sent one action but effects are firing more:\n\n```swift\n@Test func loginSendsRequest() async {\n    let store = TestStore(initialState: LoginFeature.State()) {\n        LoginFeature()\n    }\n    await store.send(.loginTapped) {\n        $0.isLoading = true\n    }\n    // Error: received .loginResponse but didn't assert it\n}\n```",
+      "assertions": [
+        {"id": "T2.1", "text": "Explains exhaustive model: must receive() all effect actions", "discriminating": false},
+        {"id": "T2.2", "text": "Shows await store.receive(.loginResponse) syntax", "discriminating": false},
+        {"id": "T2.3", "text": "Uses case key path: .receive(\\.loginResponse)", "discriminating": true},
+        {"id": "T2.4", "text": "Alternative: store.exhaustivity = .off for partial testing", "discriminating": true}
+      ]
+    },
+    {
+      "id": 15,
+      "name": "tca-testing-complex",
+      "topic": "tca-testing",
+      "difficulty": "complex",
+      "prompt": "My TCA feature has a timer that fires every second. Tests are flaky because real time passes. Also, my @Test functions don't fail when TestStore assertions fail - they just pass silently.\n\n```swift\n@Reducer struct TimerFeature {\n    @Dependency(\\.continuousClock) var clock\n    var body: some ReducerOf<Self> {\n        Reduce { state, action in\n            switch action {\n            case .startTimer:\n                return .run { send in\n                    for await _ in clock.timer(interval: .seconds(1)) {\n                        await send(.tick)\n                    }\n                }\n            case .tick:\n                state.count += 1\n                return .none\n            }\n        }\n    }\n}\n```",
+      "assertions": [
+        {"id": "T3.1", "text": "Use TestClock and advance(by:) for deterministic time", "discriminating": false},
+        {"id": "T3.2", "text": "Override dependency: withDependencies { $0.continuousClock = testClock }", "discriminating": false},
+        {"id": "T3.3", "text": "TCA + Swift Testing silent pass: requires TCA >= 1.12", "discriminating": true},
+        {"id": "T3.4", "text": "Shows testClock.advance(by: .seconds(3)) to trigger 3 ticks", "discriminating": false}
+      ]
+    },
+    {
+      "id": 16,
+      "name": "ui-testing-simple",
+      "topic": "ui-testing",
+      "difficulty": "simple",
+      "prompt": "How do I wait for a button to appear in XCUITest?",
+      "assertions": [
+        {"id": "U1.1", "text": "Uses waitForExistence(timeout:)", "discriminating": false},
+        {"id": "U1.2", "text": "Shows button.waitForExistence(timeout: 5) syntax", "discriminating": false}
+      ]
+    },
+    {
+      "id": 17,
+      "name": "ui-testing-medium",
+      "topic": "ui-testing",
+      "difficulty": "medium",
+      "prompt": "My XCUITest is flaky because a system alert for location permission blocks the flow. How do I handle system alerts?",
+      "assertions": [
+        {"id": "U2.1", "text": "Use addUIInterruptionMonitor for system alerts", "discriminating": false},
+        {"id": "U2.2", "text": "Must tap on app element after adding monitor to trigger it", "discriminating": true},
+        {"id": "U2.3", "text": "Alternative: reset authorization in setUp via launchArguments", "discriminating": true}
+      ]
+    },
+    {
+      "id": 18,
+      "name": "ui-testing-complex",
+      "topic": "ui-testing",
+      "difficulty": "complex",
+      "prompt": "Our XCUITest suite has 200 tests and takes 45 minutes. Tests are brittle - small UI changes break many tests. How do we improve maintainability and speed?",
+      "assertions": [
+        {"id": "U3.1", "text": "Page Object Model - encapsulate element queries in screen objects", "discriminating": false},
+        {"id": "U3.2", "text": "Use accessibility identifiers, not text matching", "discriminating": false},
+        {"id": "U3.3", "text": "Run in parallel with Test Plans", "discriminating": false},
+        {"id": "U3.4", "text": "Reduce UI tests - push logic to unit tests (test pyramid)", "discriminating": true},
+        {"id": "U3.5", "text": "Launch arguments to skip animations, pre-seed state", "discriminating": true}
+      ]
+    },
+    {
+      "id": 19,
+      "name": "snapshot-testing-simple",
+      "topic": "snapshot-testing",
+      "difficulty": "simple",
+      "prompt": "How do I set up snapshot testing for SwiftUI views?",
+      "assertions": [
+        {"id": "N1.1", "text": "Use PointFree's swift-snapshot-testing library", "discriminating": false},
+        {"id": "N1.2", "text": "assertSnapshot(of: view, as: .image)", "discriminating": false},
+        {"id": "N1.3", "text": "First run records reference, subsequent runs compare", "discriminating": false}
+      ]
+    },
+    {
+      "id": 20,
+      "name": "snapshot-testing-medium",
+      "topic": "snapshot-testing",
+      "difficulty": "medium",
+      "prompt": "My snapshot tests pass locally but fail on CI with tiny pixel differences. How do I fix this?",
+      "assertions": [
+        {"id": "N2.1", "text": "Pin to specific device/size: .image(layout: .device(config: .iPhone13))", "discriminating": false},
+        {"id": "N2.2", "text": "Set precision parameter: .image(precision: 0.99)", "discriminating": true},
+        {"id": "N2.3", "text": "Record snapshots on CI, not locally (or vice versa, pick one)", "discriminating": true}
+      ]
+    },
+    {
+      "id": 21,
+      "name": "snapshot-testing-complex",
+      "topic": "snapshot-testing",
+      "difficulty": "complex",
+      "prompt": "We migrated snapshot tests to Swift Testing but they silently pass even when UI is wrong:\n\n```swift\n@Test func productCardLooksRight() {\n    let view = ProductCardView(product: .sample)\n    assertSnapshot(of: view, as: .image)\n}\n```\n\nAlso, we want to test both light and dark mode but don't want to duplicate every test.",
+      "assertions": [
+        {"id": "N3.1", "text": "assertSnapshot uses XCTAssert under the hood - same C5/C7 mixing issue", "discriminating": true},
+        {"id": "N3.2", "text": "Keep snapshot tests as XCTestCase until library supports Swift Testing", "discriminating": true},
+        {"id": "N3.3", "text": "For dark mode: use parameterized test or named strategies", "discriminating": false},
+        {"id": "N3.4", "text": "Shows .image(traits: .init(userInterfaceStyle: .dark))", "discriminating": false}
+      ]
+    },
+    {
+      "id": 22,
+      "name": "integration-testing-simple",
+      "topic": "integration-testing",
+      "difficulty": "simple",
+      "prompt": "How do I test network code without hitting real servers?",
+      "assertions": [
+        {"id": "I1.1", "text": "Use URLProtocol subclass to intercept requests", "discriminating": false},
+        {"id": "I1.2", "text": "Or inject mock URLSession/protocol dependency", "discriminating": false}
+      ]
+    },
+    {
+      "id": 23,
+      "name": "integration-testing-medium",
+      "topic": "integration-testing",
+      "difficulty": "medium",
+      "prompt": "My Core Data tests are slow and sometimes fail with 'store already in use'. How do I isolate Core Data in tests?",
+      "assertions": [
+        {"id": "I2.1", "text": "Use in-memory store: NSInMemoryStoreType or /dev/null URL", "discriminating": false},
+        {"id": "I2.2", "text": "Create fresh container per test", "discriminating": false},
+        {"id": "I2.3", "text": "Use NSPersistentStoreDescription with url = URL(fileURLWithPath: \"/dev/null\")", "discriminating": true}
+      ]
+    },
+    {
+      "id": 24,
+      "name": "integration-testing-complex",
+      "topic": "integration-testing",
+      "difficulty": "complex",
+      "prompt": "Our app stores auth tokens in Keychain. Tests randomly fail because Keychain state persists between test runs. We also have UserDefaults and SwiftData. How do we fully isolate each test?",
+      "assertions": [
+        {"id": "I3.1", "text": "Keychain: protocol wrapper + in-memory mock, or unique service name per test", "discriminating": false},
+        {"id": "I3.2", "text": "UserDefaults: suiteName creates isolated domain, delete in tearDown", "discriminating": false},
+        {"id": "I3.3", "text": "SwiftData: in-memory ModelConfiguration", "discriminating": false},
+        {"id": "I3.4", "text": "Keychain state persists across app installs on simulator - may need manual clear", "discriminating": true},
+        {"id": "I3.5", "text": "Use dependency injection for all storage, not direct access", "discriminating": false}
+      ]
+    },
+    {
+      "id": 25,
+      "name": "anti-patterns-simple",
+      "topic": "anti-patterns",
+      "difficulty": "simple",
+      "prompt": "What's wrong with this test?\n\n```swift\nfunc testOrder() {\n    let order = Order(createdAt: Date())\n    XCTAssertFalse(order.isExpired)\n}\n```",
+      "assertions": [
+        {"id": "P1.1", "text": "Date() makes test non-repeatable (F.I.R.S.T violation)", "discriminating": false},
+        {"id": "P1.2", "text": "May fail at certain times (midnight, DST, etc.)", "discriminating": false},
+        {"id": "P1.3", "text": "Fix: inject deterministic date", "discriminating": false}
+      ]
+    },
+    {
+      "id": 26,
+      "name": "anti-patterns-medium",
+      "topic": "anti-patterns",
+      "difficulty": "medium",
+      "prompt": "This test passes but coverage shows the async code path wasn't executed:\n\n```swift\n@Test func dataLoads() async {\n    let vm = DataViewModel()\n    await vm.loadData()\n}\n```\n\nWhat's the problem?",
+      "assertions": [
+        {"id": "P2.1", "text": "No assertion - test with no #expect always passes", "discriminating": false},
+        {"id": "P2.2", "text": "This is anti-pattern C2: no assertion test", "discriminating": true},
+        {"id": "P2.3", "text": "Coverage executed != correctness verified", "discriminating": false}
+      ]
+    },
+    {
+      "id": 27,
+      "name": "anti-patterns-complex",
+      "topic": "anti-patterns",
+      "difficulty": "complex",
+      "prompt": "Audit this test file and list everything wrong:\n\n```swift\nimport XCTest\n@testable import MyApp\n\nclass OrderTests: XCTestCase {\n    static var sut: OrderService!\n    \n    func testFetch() async {\n        let exp = XCTestExpectation()\n        sut.fetch { exp.fulfill() }\n        wait(for: [exp], timeout: 5)\n    }\n    \n    func testProcess() {\n        Thread.sleep(forTimeInterval: 0.5)\n        let result = sut.process(Order(id: UUID()))\n        print(result)\n    }\n    \n    func testValidate() {\n        let isValid = sut.validate(10)\n        #expect(isValid)\n    }\n}\n```",
+      "assertions": [
+        {"id": "P3.1", "text": "static var sut - shared state between tests (H1)", "discriminating": false},
+        {"id": "P3.2", "text": "wait(for:) in async context - deadlock (C1)", "discriminating": false},
+        {"id": "P3.3", "text": "Thread.sleep - artificial delay (H3)", "discriminating": false},
+        {"id": "P3.4", "text": "UUID() - non-deterministic (H5)", "discriminating": false},
+        {"id": "P3.5", "text": "print(result) with no assertion (C2)", "discriminating": false},
+        {"id": "P3.6", "text": "#expect in XCTestCase - silently ignored (C6)", "discriminating": true},
+        {"id": "P3.7", "text": "sut not initialized in setUp - will crash", "discriminating": false}
+      ]
+    },
+    {
+      "id": 28,
+      "name": "test-organization-simple",
+      "topic": "test-organization",
+      "difficulty": "simple",
+      "prompt": "What's a good naming convention for test methods?",
+      "assertions": [
+        {"id": "G1.1", "text": "test_<method>_<condition>_<expected> or similar structured format", "discriminating": false},
+        {"id": "G1.2", "text": "Or @Test(\"does X when Y\") descriptive string in Swift Testing", "discriminating": false}
+      ]
+    },
+    {
+      "id": 29,
+      "name": "test-organization-medium",
+      "topic": "test-organization",
+      "difficulty": "medium",
+      "prompt": "Our test suite takes 15 minutes. How do we speed it up?",
+      "assertions": [
+        {"id": "G2.1", "text": "Run tests in parallel (Test Plans or xcodebuild -parallel-testing-enabled)", "discriminating": false},
+        {"id": "G2.2", "text": "Identify slow tests and optimize or isolate them", "discriminating": false},
+        {"id": "G2.3", "text": "Move integration tests to separate scheme/plan", "discriminating": true},
+        {"id": "G2.4", "text": "Use test pyramid - more unit tests, fewer UI tests", "discriminating": false}
+      ]
+    },
+    {
+      "id": 30,
+      "name": "test-organization-complex",
+      "topic": "test-organization",
+      "difficulty": "complex",
+      "prompt": "We have flaky tests that randomly fail on CI but pass locally. They're blocking PRs. How do we handle them without just deleting them?",
+      "assertions": [
+        {"id": "G3.1", "text": "Quarantine flaky tests in separate Test Plan", "discriminating": true},
+        {"id": "G3.2", "text": "Run quarantined tests but don't block PR on failure", "discriminating": true},
+        {"id": "G3.3", "text": "Track flaky tests with tickets, time-box fixes", "discriminating": false},
+        {"id": "G3.4", "text": "Investigate root causes: shared state, timing, CI environment differences", "discriminating": false},
+        {"id": "G3.5", "text": "Consider @Suite(.serialized) for Swift Testing parallel issues", "discriminating": true}
+      ]
+    }
+  ]
+}

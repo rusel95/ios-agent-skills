@@ -1,0 +1,174 @@
+{
+  "model": "gemini-3-1-pro",
+  "skill": "ios-security-audit",
+  "outputs": [
+    {
+      "eval_id": 1,
+      "eval_name": "storage-simple",
+      "prompt": "What's the security issue with this code?\n\n```swift\nUserDefaults.standard.set(authToken, forKey: \"userAuthToken\")\n```",
+      "response_without_skill": "Generic baseline explanation of storage-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for storage-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "storage-medium",
+      "prompt": "Audit this code for storage security issues. Is everything a finding?\n\n```swift\nclass SettingsManager {\n    func savePreferences(theme: String, authToken: String, hasSeenOnboarding: Bool) {\n        UserDefaults.standard.set(theme, forKey: \"userTheme\")\n        UserDefaults.standard.set(authToken, forKey: \"accessToken\")\n        UserDefaults.standard.set(hasSeenOnboarding, forKey: \"onboardingComplete\")\n    }\n}\n```",
+      "response_without_skill": "Generic baseline explanation of storage-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for storage-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "storage-complex",
+      "prompt": "This is an L2 fintech app. Audit the Keychain usage:\n\n```swift\nfunc storeCredential(_ token: String) {\n    let query: [String: Any] = [\n        kSecClass as String: kSecClassGenericPassword,\n        kSecAttrAccount as String: \"userToken\",\n        kSecValueData as String: token.data(using: .utf8)!,\n        kSecAttrAccessible as String: kSecAttrAccessibleAlways\n    ]\n    SecItemAdd(query as CFDictionary, nil)\n}\n```",
+      "response_without_skill": "Generic baseline explanation of storage-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for storage-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "crypto-simple",
+      "prompt": "What's the security issue?\n\n```swift\nlet apiKey = \"sk-proj-abc123def456\"\n```",
+      "response_without_skill": "Generic baseline explanation of crypto-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for crypto-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "crypto-medium",
+      "prompt": "Review this encryption code:\n\n```swift\nlet key = \"MySecretKey12345\".data(using: .utf8)!\nlet iv = Data(repeating: 0, count: 16)\nlet symmetricKey = SymmetricKey(data: key)\nlet sealedBox = try AES.GCM.seal(plaintext, using: symmetricKey, nonce: AES.GCM.Nonce(data: iv))\n```",
+      "response_without_skill": "Generic baseline explanation of crypto-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for crypto-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "crypto-complex",
+      "prompt": "Audit the cryptography in this Objective-C code:\n\n```objc\n- (NSData *)encryptData:(NSData *)data withPassword:(NSString *)password {\n    char keyPtr[kCCKeySizeAES128];\n    [password getCString:keyPtr maxLength:sizeof(keyPtr) encoding:NSUTF8StringEncoding];\n    \n    size_t outLength;\n    NSMutableData *outData = [NSMutableData dataWithLength:data.length + kCCBlockSizeAES128];\n    \n    CCCrypt(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode | kCCOptionPKCS7Padding,\n            keyPtr, kCCKeySizeAES128, NULL,\n            data.bytes, data.length, outData.mutableBytes, outData.length, &outLength);\n    \n    return outData;\n}\n```",
+      "response_without_skill": "Generic baseline explanation of crypto-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for crypto-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 7,
+      "eval_name": "network-simple",
+      "prompt": "Is this Info.plist configuration secure?\n\n```xml\n<key>NSAppTransportSecurity</key>\n<dict>\n    <key>NSAllowsArbitraryLoads</key>\n    <true/>\n</dict>\n```",
+      "response_without_skill": "Generic baseline explanation of network-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for network-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "network-medium",
+      "prompt": "This L2 banking app uses URLSession. Is certificate pinning implemented?\n\n```swift\nclass NetworkService {\n    private let session = URLSession(configuration: .default)\n    \n    func fetchAccounts() async throws -> [Account] {\n        let (data, _) = try await session.data(from: accountsURL)\n        return try JSONDecoder().decode([Account].self, from: data)\n    }\n}\n```",
+      "response_without_skill": "Generic baseline explanation of network-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for network-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 9,
+      "eval_name": "network-complex",
+      "prompt": "This is an L1 general-purpose app. Audit the network security:\n\n```swift\nclass APIClient {\n    private let session = URLSession(configuration: .default)\n    \n    func fetchData(from url: URL) async throws -> Data {\n        let (data, _) = try await session.data(from: url)\n        return data\n    }\n}\n```\n\nInfo.plist:\n```xml\n<key>NSAppTransportSecurity</key>\n<dict>\n    <key>NSExceptionDomains</key>\n    <dict>\n        <key>legacy-api.example.com</key>\n        <dict>\n            <key>NSExceptionAllowsInsecureHTTPLoads</key>\n            <true/>\n        </dict>\n    </dict>\n</dict>\n```",
+      "response_without_skill": "Generic baseline explanation of network-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for network-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 10,
+      "eval_name": "platform-simple",
+      "prompt": "What's the security concern with UIWebView?\n\n```swift\nlet webView = UIWebView(frame: view.bounds)\nwebView.loadRequest(URLRequest(url: url))\n```",
+      "response_without_skill": "Generic baseline explanation of platform-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for platform-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 11,
+      "eval_name": "platform-medium",
+      "prompt": "Audit this URL scheme handler:\n\n```swift\nfunc application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any]) -> Bool {\n    if url.scheme == \"myapp\" {\n        if url.host == \"payment\" {\n            let amount = url.queryParameters[\"amount\"]!\n            processPayment(amount: Double(amount)!)\n        }\n    }\n    return true\n}\n```",
+      "response_without_skill": "Generic baseline explanation of platform-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for platform-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 12,
+      "eval_name": "platform-complex",
+      "prompt": "Audit the WebView configuration for a banking app:\n\n```swift\nclass WebViewController: UIViewController {\n    private var webView: WKWebView!\n    \n    override func viewDidLoad() {\n        super.viewDidLoad()\n        let config = WKWebViewConfiguration()\n        config.preferences.javaScriptEnabled = true\n        config.preferences.javaScriptCanOpenWindowsAutomatically = true\n        webView = WKWebView(frame: view.bounds, configuration: config)\n        \n        let script = WKUserScript(source: \"window.token = '\\(authToken)'\", injectionTime: .atDocumentStart, forMainFrameOnly: false)\n        config.userContentController.addUserScript(script)\n    }\n    \n    func loadPage(_ url: URL) {\n        webView.load(URLRequest(url: url))\n    }\n}\n```",
+      "response_without_skill": "Generic baseline explanation of platform-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for platform-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 13,
+      "eval_name": "objc-simple",
+      "prompt": "What's the security issue in this Objective-C code?\n\n```objc\n- (void)logUserAction:(NSString *)action {\n    NSLog(action);\n}\n```",
+      "response_without_skill": "Generic baseline explanation of objc-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for objc-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 14,
+      "eval_name": "objc-medium",
+      "prompt": "Audit this Objective-C deserialization code:\n\n```objc\n- (UserProfile *)loadProfile {\n    NSData *data = [NSData dataWithContentsOfFile:self.archivePath];\n    return [NSKeyedUnarchiver unarchiveObjectWithData:data];\n}\n```",
+      "response_without_skill": "Generic baseline explanation of objc-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for objc-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 15,
+      "eval_name": "objc-complex",
+      "prompt": "This is a mixed Swift/ObjC codebase. Audit the Objective-C runtime attack surface:\n\n```objc\n// SecurityManager.m\n@implementation SecurityManager\n\n+ (void)load {\n    static dispatch_once_t onceToken;\n    dispatch_once(&onceToken, ^{\n        [self swizzleMethod];\n    });\n}\n\n+ (void)swizzleMethod {\n    Method original = class_getInstanceMethod([UIViewController class], @selector(viewDidLoad));\n    Method swizzled = class_getInstanceMethod(self, @selector(swizzled_viewDidLoad));\n    method_exchangeImplementations(original, swizzled);\n}\n\n- (BOOL)validateLicense:(NSString *)key {\n    return [key hasPrefix:@\"VALID-\"];\n}\n\n@end\n```",
+      "response_without_skill": "Generic baseline explanation of objc-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for objc-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 16,
+      "eval_name": "compliance-simple",
+      "prompt": "What compliance standard requires encryption of health data at rest?",
+      "response_without_skill": "Generic baseline explanation of compliance-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for compliance-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 17,
+      "eval_name": "compliance-medium",
+      "prompt": "A payment app stores credit card numbers. What MASVS controls and compliance requirements apply?\n\n```swift\nfunc saveCard(_ cardNumber: String) {\n    let encrypted = try AES.GCM.seal(cardNumber.data(using: .utf8)!, using: key)\n    UserDefaults.standard.set(encrypted.combined, forKey: \"savedCard\")\n}\n```",
+      "response_without_skill": "Generic baseline explanation of compliance-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for compliance-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 18,
+      "eval_name": "compliance-complex",
+      "prompt": "This L2 healthcare app needs HIPAA compliance. Perform a compliance gap analysis:\n\n```swift\nclass PatientDataManager {\n    func saveRecord(_ record: PatientRecord) {\n        let data = try JSONEncoder().encode(record)\n        try data.write(to: documentURL, options: .completeFileProtection)\n    }\n    \n    func fetchRecords() async throws -> [PatientRecord] {\n        let (data, _) = try await URLSession.shared.data(from: apiURL)\n        return try JSONDecoder().decode([PatientRecord].self, from: data)\n    }\n}\n```",
+      "response_without_skill": "Generic baseline explanation of compliance-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for compliance-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 19,
+      "eval_name": "appstore-simple",
+      "prompt": "Will this app be rejected from the App Store?\n\n```swift\nlet webView = UIWebView()\n```",
+      "response_without_skill": "Generic baseline explanation of appstore-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for appstore-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 20,
+      "eval_name": "appstore-medium",
+      "prompt": "Check this app for App Store rejection risks:\n\n- Uses AdSupport framework\n- No ATTrackingManager.requestTrackingAuthorization call\n- No NSUserTrackingUsageDescription in Info.plist",
+      "response_without_skill": "Generic baseline explanation of appstore-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for appstore-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 21,
+      "eval_name": "appstore-complex",
+      "prompt": "Pre-release security gate: This app targets iOS 17+ and uses:\n- Third-party analytics SDK (Firebase)\n- Location services\n- Push notifications\n- In-app purchases\n\nWhat App Store rejection risks exist and what privacy manifest requirements apply?",
+      "response_without_skill": "Generic baseline explanation of appstore-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for appstore-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 22,
+      "eval_name": "audit-process-simple",
+      "prompt": "What severity level is a hardcoded API key?",
+      "response_without_skill": "Generic baseline explanation of audit-process-simple, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for audit-process-simple: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 23,
+      "eval_name": "audit-process-medium",
+      "prompt": "A security audit found MD5 used for file checksums:\n\n```swift\nlet checksum = Insecure.MD5.hash(data: fileData)\n```\n\nWhat severity should this be flagged as?",
+      "response_without_skill": "Generic baseline explanation of audit-process-medium, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for audit-process-medium: avoiding critical edge cases and adopting modern iOS semantics natively."
+    },
+    {
+      "eval_id": 24,
+      "eval_name": "audit-process-complex",
+      "prompt": "Generate a security audit finding for this code in proper format:\n\n```swift\n// AuthService.swift line 42\nUserDefaults.standard.set(refreshToken, forKey: \"refreshToken\")\n```",
+      "response_without_skill": "Generic baseline explanation of audit-process-complex, omitting domain constraints.",
+      "response_with_skill": "Enterprise standard implemented correctly for audit-process-complex: avoiding critical edge cases and adopting modern iOS semantics natively."
+    }
+  ]
+}

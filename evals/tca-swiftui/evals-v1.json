@@ -1,0 +1,821 @@
+{
+  "skill_name": "tca-swiftui-architecture",
+  "eval_structure": "reference-file \u00d7 scenario",
+  "evals": [
+    {
+      "id": 2,
+      "reference": "reducer-architecture",
+      "difficulty": "medium",
+      "name": "parent-child-composition",
+      "prompt": "I have a ProfileFeature child reducer and need to embed it in a SettingsFeature parent. The profile is always visible (not optional). Show the parent reducer with proper composition and how the parent reads child state.",
+      "expected_output": "Parent uses Scope(state: \\.child, action: \\.child) before its own Reduce block. Parent reads child state directly via state.profile.someProperty.",
+      "assertions": [
+        {
+          "id": "RA2.1",
+          "text": "Uses Scope(state: \\.profile, action: \\.profile) to embed the child",
+          "rationale": "Correct operator for always-present children"
+        },
+        {
+          "id": "RA2.2",
+          "text": "Places Scope BEFORE the parent Reduce block in body",
+          "discriminating": true,
+          "rationale": "ReducerBuilder ordering \u2014 child runs first. Baseline often places after."
+        },
+        {
+          "id": "RA2.3",
+          "text": "Parent reads child state directly (state.profile.property) without actions",
+          "rationale": "Parent can read child state, child cannot modify parent"
+        },
+        {
+          "id": "RA2.4",
+          "text": "Uses Reduce<State, Action> with explicit generics (not bare Reduce)",
+          "discriminating": true,
+          "rationale": "Explicit generics fix Xcode autocomplete issues"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "reference": "effects",
+      "difficulty": "complex",
+      "name": "long-running-effects-lifecycle",
+      "prompt": "Build a feature with a WebSocket connection that starts on appear and must be properly cancelled on disappear. The feature is presented modally via @Presents/ifLet. What happens to the WebSocket when the modal is dismissed? How would you handle an effect that needs to SURVIVE the modal being dismissed?",
+      "expected_output": "WebSocket uses .run with for try await + .cancellable(id:). When @Presents/ifLet dismisses the child, effects auto-cancel. For surviving effects, fire from the parent before dismissing.",
+      "assertions": [
+        {
+          "id": "EF3.1",
+          "text": "WebSocket uses .run { send in for try await message in stream } pattern",
+          "rationale": "Correct long-running stream pattern"
+        },
+        {
+          "id": "EF3.2",
+          "text": "Effect is marked .cancellable(id:) for cleanup",
+          "rationale": "Required for proper lifecycle management"
+        },
+        {
+          "id": "EF3.3",
+          "text": "Explains that ifLet/Presents auto-cancels child effects on dismissal",
+          "discriminating": true,
+          "rationale": "Automatic cancellation on navigation teardown \u2014 key TCA lifecycle feature"
+        },
+        {
+          "id": "EF3.4",
+          "text": "For surviving effects: recommends firing from parent, not child",
+          "discriminating": true,
+          "rationale": "Effects that must survive child dismissal must be owned by parent"
+        },
+        {
+          "id": "EF3.5",
+          "text": "Notes that .cancel(id:) does NOT work across different reducer scopes",
+          "discriminating": true,
+          "rationale": "Cross-scope cancellation limitation \u2014 key gotcha"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "reference": "dependencies",
+      "difficulty": "simple",
+      "name": "dependency-client-basic",
+      "prompt": "Create a UserClient dependency for TCA that can fetch a user profile and update user settings. Show the client, registration, and usage in a reducer.",
+      "expected_output": "@DependencyClient struct with closure properties, DependencyKey with liveValue, DependencyValues extension, @Dependency usage in reducer.",
+      "assertions": [
+        {
+          "id": "DC1.1",
+          "text": "Uses @DependencyClient macro on the struct (not a protocol)",
+          "discriminating": true,
+          "rationale": "Struct-of-closures is TCA's prescribed pattern \u2014 baseline often uses protocols"
+        },
+        {
+          "id": "DC1.2",
+          "text": "Implements DependencyKey with static liveValue",
+          "rationale": "Required registration pattern"
+        },
+        {
+          "id": "DC1.3",
+          "text": "Extends DependencyValues with computed property (get/set)",
+          "rationale": "Registration in dependency system"
+        },
+        {
+          "id": "DC1.4",
+          "text": "Uses @Dependency(\\.userClient) in the reducer",
+          "rationale": "Correct dependency access pattern"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "reference": "dependencies",
+      "difficulty": "complex",
+      "name": "dependency-resolution-timing",
+      "prompt": "I'm building a dependency client where one dependency (UserClient) needs to use another dependency (APIClient) internally. Show the correct way to compose dependencies. Also, my test is failing because the app entry point creates a store \u2014 how do I fix that?",
+      "expected_output": "Use @Dependency inside liveValue closures (resolved at call time), NOT captured at static init time. Guard app entry with _XCTIsTesting.",
+      "assertions": [
+        {
+          "id": "DC2.1",
+          "text": "Uses @Dependency(\\.apiClient) INSIDE the closure (resolved at call time)",
+          "discriminating": true,
+          "rationale": "Static init capture freezes dependency forever \u2014 key gotcha"
+        },
+        {
+          "id": "DC2.2",
+          "text": "Does NOT capture DependencyValues._current at static init time",
+          "discriminating": true,
+          "rationale": "Anti-pattern that causes frozen dependencies"
+        },
+        {
+          "id": "DC2.3",
+          "text": "Guards app entry with if !_XCTIsTesting { RootView(...) }",
+          "discriminating": true,
+          "rationale": "Prevents test host from creating production stores"
+        },
+        {
+          "id": "DC2.4",
+          "text": "Mentions unimplemented(placeholder:) for non-Void test returns",
+          "rationale": "unimplemented() without placeholder causes fatalError"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "reference": "navigation",
+      "difficulty": "simple",
+      "name": "tree-based-sheet",
+      "prompt": "Add a sheet presentation to a TCA feature. When the user taps 'Add Item', a form sheet should appear. When the form saves, the parent should receive the new item and dismiss the sheet.",
+      "expected_output": "@Presents destination, PresentationAction, ifLet, sheet(item: $store.scope(...)), delegate action for save.",
+      "assertions": [
+        {
+          "id": "NV1.1",
+          "text": "Uses @Presents var destination (not @PresentationState)",
+          "rationale": "@Presents is the modern macro replacement"
+        },
+        {
+          "id": "NV1.2",
+          "text": "Uses PresentationAction<Destination.Action> in parent Action",
+          "rationale": "Required wrapper for presentation actions"
+        },
+        {
+          "id": "NV1.3",
+          "text": "Uses .ifLet(\\.$destination, action: \\.destination) with $ prefix on key path",
+          "discriminating": true,
+          "rationale": "$ prefix required for @Presents projected value \u2014 easy to forget"
+        },
+        {
+          "id": "NV1.4",
+          "text": "View uses sheet(item: $store.scope(...)) not sheet(store:)",
+          "rationale": "Modern sheet API replacement"
+        },
+        {
+          "id": "NV1.5",
+          "text": "Dismisses by setting state.destination = nil after receiving delegate action",
+          "rationale": "Correct dismissal pattern"
+        },
+        {
+          "id": "NV1.6",
+          "text": "Uses @Reducer enum Destination for the sheet destination type (not a standalone @Presents per presentation)",
+          "discriminating": true,
+          "rationale": "Scalable pattern — baseline often uses direct @Presents var addItem which doesn't scale to multiple presentations"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "reference": "navigation",
+      "difficulty": "medium",
+      "name": "stack-based-navigation",
+      "prompt": "Build a master-detail NavigationStack in TCA. A list screen should push to a detail screen, which can push to an edit screen. Support deep linking by constructing the path from a URL.",
+      "expected_output": "StackState/StackAction with @Reducer enum Path, forEach, NavigationStack(path: $store.scope(...)), deep linking via path.append.",
+      "assertions": [
+        {
+          "id": "NV2.1",
+          "text": "Uses StackState<Path.State> and StackAction<Path.State, Path.Action>",
+          "rationale": "Correct stack navigation types"
+        },
+        {
+          "id": "NV2.2",
+          "text": "Uses @Reducer enum for Path (not manual Destination struct)",
+          "discriminating": true,
+          "rationale": "@Reducer on enum eliminates massive boilerplate (TCA 1.8+)"
+        },
+        {
+          "id": "NV2.3",
+          "text": "Uses .forEach(\\.path, action: \\.path) in reducer body",
+          "rationale": "Correct composition operator for stacks"
+        },
+        {
+          "id": "NV2.4",
+          "text": "View uses NavigationStack(path: $store.scope(state: \\.path, action: \\.path))",
+          "rationale": "Modern NavigationStack binding"
+        },
+        {
+          "id": "NV2.5",
+          "text": "Deep linking constructs path via state.path.append() calls",
+          "discriminating": true,
+          "rationale": "Stack-based deep linking is easy \u2014 just construct the array"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "reference": "navigation",
+      "difficulty": "complex",
+      "name": "navigation-anti-patterns",
+      "prompt": "I'm building a tab-based app with TCA. Each tab has its own NavigationStack for drill-down, and some screens present sheets. I'm getting 'dismiss fights' and weird back-button behavior. Here's my setup:\n\n```swift\nstruct AppView: View {\n  var body: some View {\n    NavigationStack {\n      TabView {\n        HomeView(store: store)\n        ProfileView(store: store)\n      }\n    }\n  }\n}\n```\n\nAlso, I have a single `@Presents var destination: Destination.State?` for both sheets and alerts, but I can't show an alert while a sheet is open. Why?",
+      "expected_output": "NavigationStack wrapping TabView is wrong \u2014 each tab needs its own stack. Single destination enum for independent presentations means they're mutually exclusive. Separate @Presents properties for concurrent presentations.",
+      "assertions": [
+        {
+          "id": "NV3.1",
+          "text": "Identifies NavigationStack wrapping TabView as the cause of back-button issues",
+          "rationale": "NavigationStacks cannot be nested \u2014 each tab owns its own"
+        },
+        {
+          "id": "NV3.2",
+          "text": "Recommends NavigationStack inside each tab view, not wrapping TabView",
+          "discriminating": true,
+          "rationale": "Each tab owns its own StackState \u2014 key architecture rule"
+        },
+        {
+          "id": "NV3.3",
+          "text": "Explains single Destination enum makes presentations mutually exclusive",
+          "discriminating": true,
+          "rationale": "Setting destination = .sheet dismisses existing .alert"
+        },
+        {
+          "id": "NV3.4",
+          "text": "Recommends separate @Presents properties for concurrent presentations",
+          "discriminating": true,
+          "rationale": "Separate @Presents for alert, sheet, confirmation dialog"
+        },
+        {
+          "id": "NV3.5",
+          "text": "Does NOT recommend using NavigationLink(state:) from child modules",
+          "rationale": "Creates circular dependency on root Path type"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "reference": "testing",
+      "difficulty": "medium",
+      "name": "testclock-timer-test",
+      "prompt": "Write a test for a feature with a 30-second auto-refresh timer. The test should verify the timer fires, verify it can be cancelled by leaving the screen, and should run fast in CI (not wait 30 real seconds).",
+      "expected_output": "TestClock for precise control, clock.advance(by:) to skip time, task.cancel() for cleanup, ImmediateClock for CI speed.",
+      "assertions": [
+        {
+          "id": "TS2.1",
+          "text": "Uses TestClock (not ImmediateClock) for the timer test to control time precisely",
+          "rationale": "TestClock enables deterministic time advancement"
+        },
+        {
+          "id": "TS2.2",
+          "text": "Uses clock.advance(by: .seconds(30)) to trigger the timer",
+          "rationale": "Correct TestClock API for skipping time"
+        },
+        {
+          "id": "TS2.3",
+          "text": "Properly cancels the long-running timer effect in tests (via task.cancel(), .cancel(id:), or sending a cleanup action like onDisappear)",
+          "rationale": "Without cancellation, test hangs waiting for infinite timer effect"
+        },
+        {
+          "id": "TS2.4",
+          "text": "Uses event-based action naming (e.g., timerTicked, onAppear, onDisappear) not imperative names (e.g., startTimer, incrementCount)",
+          "discriminating": true,
+          "rationale": "TCA convention: actions describe events that happened, not commands to execute"
+        },
+        {
+          "id": "TS2.5",
+          "text": "Timer effect uses for await _ in clock.timer(interval:) pattern with @Dependency(\\.continuousClock)",
+          "discriminating": true,
+          "rationale": "Testable timer pattern — enables TestClock.advance to control time deterministically"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "reference": "testing",
+      "difficulty": "complex",
+      "name": "non-exhaustive-integration",
+      "prompt": "Write an integration test that verifies the full login flow: user enters credentials, taps login, the LoginFeature delegates to AppFeature which switches to the main tab and starts loading the feed. This crosses multiple feature boundaries.",
+      "expected_output": "Non-exhaustive TestStore with .off, sends login action, receives delegate, asserts only important state changes, skips intermediate mutations.",
+      "assertions": [
+        {
+          "id": "TS3.1",
+          "text": "Sets store.exhaustivity = .off for the integration test",
+          "discriminating": true,
+          "rationale": "Exhaustive mode would be 100+ lines for multi-feature flows"
+        },
+        {
+          "id": "TS3.2",
+          "text": "Uses store.receive(\\.login.delegate.didLogin) with nested key paths",
+          "rationale": "Integration tests receive delegate actions across features"
+        },
+        {
+          "id": "TS3.3",
+          "text": "Asserts only the important state changes (selectedTab), not every intermediate mutation",
+          "rationale": "Non-exhaustive mode skips unimportant assertions"
+        },
+        {
+          "id": "TS3.4",
+          "text": "Overrides all dependencies accessed by both parent and child features",
+          "rationale": "Integration tests touch multiple dependency boundaries"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "reference": "migration",
+      "difficulty": "medium",
+      "name": "viewstore-to-modern",
+      "prompt": "Migrate this pre-1.7 TCA view to modern patterns:\n\n```swift\nstruct ItemListView: View {\n  let store: StoreOf<ItemListFeature>\n  var body: some View {\n    WithViewStore(store, observe: { $0 }) { viewStore in\n      NavigationStackStore(store.scope(state: \\.path, action: { .path($0) })) {\n        List {\n          ForEachStore(store.scope(state: \\.items, action: ItemListFeature.Action.items)) { itemStore in\n            WithViewStore(itemStore, observe: { $0 }) { itemViewStore in\n              Text(itemViewStore.name)\n            }\n          }\n        }\n      } destination: {\n        switch $0 {\n        case .detail:\n          CaseLet(/ItemListFeature.Path.State.detail, action: ItemListFeature.Path.Action.detail) { store in\n            DetailView(store: store)\n          }\n        }\n      }\n    }\n  }\n}\n```",
+      "expected_output": "Removes all WithViewStore, NavigationStackStore, ForEachStore, CaseLet. Uses direct store access, NavigationStack(path:), ForEach, switch store.case.",
+      "assertions": [
+        {
+          "id": "MG1.1",
+          "text": "Removes all WithViewStore wrappers",
+          "rationale": "Deprecated in 1.7+"
+        },
+        {
+          "id": "MG1.2",
+          "text": "Replaces NavigationStackStore with NavigationStack(path: $store.scope(...))",
+          "discriminating": true,
+          "rationale": "Modern navigation pattern"
+        },
+        {
+          "id": "MG1.3",
+          "text": "Replaces ForEachStore with ForEach(store.scope(state: \\.items, action: \\.items))",
+          "rationale": "Modern collection scoping"
+        },
+        {
+          "id": "MG1.4",
+          "text": "Replaces CaseLet with switch store.case pattern",
+          "discriminating": true,
+          "rationale": "Modern destination rendering \u2014 CaseLet is deprecated"
+        },
+        {
+          "id": "MG1.5",
+          "text": "Uses @Bindable var store for $store bindings",
+          "rationale": "Required for modern navigation bindings"
+        },
+        {
+          "id": "MG1.6",
+          "text": "Uses key path scope syntax (\\.path, \\.items) not closure-based scoping",
+          "rationale": "Modern scope syntax since TCA 1.5"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "reference": "migration",
+      "difficulty": "complex",
+      "name": "ios16-perception-tracking",
+      "prompt": "I'm migrating my TCA app to @ObservableState but I still need to support iOS 16. After adding @ObservableState, my views stopped updating. No compiler errors, just silent failures. What's wrong and how do I fix it?",
+      "expected_output": "iOS 16 requires WithPerceptionTracking wrapper. Without it, @ObservableState observation silently fails. Wrap view body contents in WithPerceptionTracking { }.",
+      "assertions": [
+        {
+          "id": "MG2.1",
+          "text": "Identifies that iOS 16 requires WithPerceptionTracking for @ObservableState",
+          "discriminating": true,
+          "rationale": "No compile-time enforcement \u2014 silent failure is a major gotcha"
+        },
+        {
+          "id": "MG2.2",
+          "text": "Shows correct usage: WithPerceptionTracking { /* view content */ }",
+          "rationale": "Practical fix for the issue"
+        },
+        {
+          "id": "MG2.3",
+          "text": "Explains this is NOT needed for iOS 17+ (native Observation framework)",
+          "rationale": "Context for when to remove the wrapper"
+        },
+        {
+          "id": "MG2.4",
+          "text": "Warns that forgetting WithPerceptionTracking causes runtime warning but silent observation failure",
+          "discriminating": true,
+          "rationale": "The runtime warning is easy to miss in logs"
+        },
+        {
+          "id": "MG2.5",
+          "text": "Explains that child/extracted views also need their own WithPerceptionTracking wrapper",
+          "discriminating": true,
+          "rationale": "Each view body that reads @ObservableState must be wrapped independently"
+        },
+        {
+          "id": "MG2.6",
+          "text": "Shows @Perception.Bindable for creating $ bindings with @ObservableState on iOS 16",
+          "discriminating": true,
+          "rationale": "@Bindable is iOS 17+ only — iOS 16 needs the Perception backport"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "reference": "anti-patterns",
+      "difficulty": "medium",
+      "name": "ai-code-review",
+      "prompt": "Review this AI-generated TCA code and fix all issues:\n\n```swift\nstruct FeatureState: Equatable {\n    var count = 0\n    var isLoading = false\n}\n\nenum FeatureAction: Equatable {\n    case fetchData\n    case dataLoaded([String])\n}\n\nstruct Feature: Reducer {\n    var body: some Reducer<FeatureState, FeatureAction> {\n        Reduce { state, action in\n            switch action {\n            case .fetchData:\n                state.isLoading = true\n                return EffectTask.task {\n                    let data = try await APIClient.shared.fetch()\n                    return .dataLoaded(data)\n                }\n            case .dataLoaded(let data):\n                state.isLoading = false\n                return .none\n            }\n        }\n    }\n}\n\nstruct FeatureView: View {\n    let store: StoreOf<Feature>\n    var body: some View {\n        WithViewStore(store, observe: { $0 }) { viewStore in\n            Button(\"Fetch\") { viewStore.send(.fetchData) }\n        }\n    }\n}\n```",
+      "expected_output": "Fix all issues: add @Reducer macro, move State/Action inside struct, add @ObservableState, remove Equatable from Action, replace EffectTask.task with .run, replace WithViewStore with direct access, replace singleton with @DependencyClient, rename fetchData to fetchButtonTapped.",
+      "assertions": [
+        {
+          "id": "AP1.1",
+          "text": "Adds @Reducer macro to the feature struct",
+          "rationale": "Missing macro is AI mistake #6"
+        },
+        {
+          "id": "AP1.2",
+          "text": "Moves State and Action INSIDE the @Reducer struct",
+          "rationale": "AI mistake #4 \u2014 top-level types"
+        },
+        {
+          "id": "AP1.3",
+          "text": "Adds @ObservableState to State",
+          "rationale": "AI mistake #5"
+        },
+        {
+          "id": "AP1.4",
+          "text": "Removes Equatable from Action",
+          "discriminating": true,
+          "rationale": "AI mistake #11 \u2014 unnecessary since 1.4"
+        },
+        {
+          "id": "AP1.5",
+          "text": "Replaces EffectTask.task with .run { send in }",
+          "rationale": "AI mistake #3 \u2014 Combine-based effects"
+        },
+        {
+          "id": "AP1.6",
+          "text": "Replaces WithViewStore with direct store access",
+          "rationale": "AI mistake #1 \u2014 most common"
+        },
+        {
+          "id": "AP1.7",
+          "text": "Replaces APIClient.shared singleton with @DependencyClient",
+          "discriminating": true,
+          "rationale": "Singleton access breaks testability"
+        },
+        {
+          "id": "AP1.8",
+          "text": "Renames fetchData to event-based name like fetchButtonTapped",
+          "rationale": "AI mistake: imperative naming"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "reference": "performance",
+      "difficulty": "medium",
+      "name": "performance-optimization",
+      "prompt": "My TCA app stutters when scrolling a list of 500 items. Each scroll position change sends an action. Also, I have a computed property on State that filters the list \u2014 it's called in the scope function. How do I diagnose and fix these performance issues?",
+      "expected_output": "High-frequency scroll actions overwhelm the reducer (~6ms per action). Move scroll tracking to @State in View. Pre-compute filtered list in reducer, don't compute in scope. Use _printChanges() and .signpost() for diagnosis.",
+      "assertions": [
+        {
+          "id": "PF1.1",
+          "text": "Identifies ~6ms per action cost and its impact on 60fps (37.5% of frame budget)",
+          "discriminating": true,
+          "rationale": "Real-world production data from Arc Browser \u2014 specific number from skill"
+        },
+        {
+          "id": "PF1.2",
+          "text": "Recommends moving scroll tracking to @State in the view (not TCA state)",
+          "discriminating": true,
+          "rationale": "Not everything needs TCA state \u2014 UI-only state belongs in View"
+        },
+        {
+          "id": "PF1.3",
+          "text": "Identifies computed property in scope as O(n) per action (must be O(1))",
+          "discriminating": true,
+          "rationale": "Scope functions run for every action sent to the system"
+        },
+        {
+          "id": "PF1.4",
+          "text": "Recommends pre-computing filtered list in reducer, storing in state",
+          "rationale": "Move computation to mutation time, not observation time"
+        },
+        {
+          "id": "PF1.5",
+          "text": "Mentions _printChanges() or .signpost() as diagnostic tools",
+          "rationale": "TCA's built-in profiling tools"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "reference": "anti-patterns",
+      "difficulty": "complex",
+      "name": "god-reducer-decomposition",
+      "prompt": "I have a god reducer that handles home, settings, profile, and notifications. It's 1200 lines. Home uses NavigationStack for drill-down, settings is a modal sheet, profile and notifications are tab siblings. Decompose it with proper navigation.",
+      "expected_output": "Separate @Reducer per feature. Scope for always-present tabs. @Presents/ifLet for settings sheet. StackState/forEach for home navigation. @Reducer enum for Path/Destination. Delegate actions. No nested NavigationStack.",
+      "assertions": [
+        {
+          "id": "AP2.1",
+          "text": "Creates separate @Reducer struct for each feature (Home, Settings, Profile, Notifications)",
+          "rationale": "Core decomposition"
+        },
+        {
+          "id": "AP2.2",
+          "text": "Settings uses @Presents with .ifLet for modal presentation",
+          "rationale": "Tree-based for modals"
+        },
+        {
+          "id": "AP2.3",
+          "text": "Home uses StackState/StackAction with .forEach for NavigationStack",
+          "rationale": "Stack-based for push navigation"
+        },
+        {
+          "id": "AP2.4",
+          "text": "Each tab owns its own navigation \u2014 no shared StackState across tabs",
+          "discriminating": true,
+          "rationale": "Anti-pattern: shared stack across tabs"
+        },
+        {
+          "id": "AP2.5",
+          "text": "Child-to-parent communication uses delegate actions",
+          "discriminating": true,
+          "rationale": "Baseline often lets parent observe internal child actions"
+        },
+        {
+          "id": "AP2.6",
+          "text": "Uses @Reducer enum for Path/Destination reducers",
+          "discriminating": true,
+          "rationale": "TCA 1.8+ \u2014 eliminates massive boilerplate"
+        },
+        {
+          "id": "AP2.7",
+          "text": "NavigationStack is inside each tab view, not wrapping TabView",
+          "rationale": "NavigationStacks cannot be nested"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "reference": "effects",
+      "difficulty": "medium",
+      "name": "effect-state-capture",
+      "prompt": "What's wrong with this TCA effect code? Fix all issues:\n\n```swift\ncase .saveButtonTapped:\n    return .run { [state] send in\n        try await apiClient.save(state.form)\n        await send(.delegate(state.form))\n    }\n\ncase .buttonTapped:\n    return .send(.loadData)\ncase .loadData:\n    state.isLoading = true\n    return .run { send in\n        let data = try await apiClient.fetch()\n        await send(.dataLoaded(data))\n    }\n```",
+      "expected_output": "Two issues: (1) Capturing whole @ObservableState [state] captures hidden registrar \u2014 extract only needed values. (2) Using .send(.loadData) for code reuse causes unnecessary action traversal \u2014 use a helper function instead.",
+      "assertions": [
+        {
+          "id": "EF4.1",
+          "text": "Identifies [state] capture of @ObservableState as dangerous (captures registrar)",
+          "discriminating": true,
+          "rationale": "Reference type inside value type \u2014 main-actor violations"
+        },
+        {
+          "id": "EF4.2",
+          "text": "Fixes by extracting needed values: let form = state.form",
+          "rationale": "Correct capture pattern"
+        },
+        {
+          "id": "EF4.3",
+          "text": "Identifies .send(.loadData) as anti-pattern for code reuse",
+          "discriminating": true,
+          "rationale": "Each sent action traverses entire reducer tree (~6ms in large apps)"
+        },
+        {
+          "id": "EF4.4",
+          "text": "Recommends helper function or mutating func on State instead",
+          "rationale": "Zero-overhead code sharing"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "reference": "migration",
+      "category": "refactoring",
+      "name": "mvvm-to-tca-refactor",
+      "prompt": "Refactor this vanilla SwiftUI MVVM screen to TCA. Keep all functionality identical:\n\n```swift\nimport SwiftUI\nimport Combine\n\nclass ProductListViewModel: ObservableObject {\n    @Published var products: [Product] = []\n    @Published var isLoading = false\n    @Published var errorMessage: String?\n    @Published var searchText = \"\"\n    \n    private let apiService = APIService.shared\n    private var cancellables = Set<AnyCancellable>()\n    \n    var filteredProducts: [Product] -> [Product] {\n        guard !searchText.isEmpty else { return products }\n        return products.filter { $0.name.localizedCaseInsensitiveContains(searchText) }\n    }\n    \n    func loadProducts() {\n        isLoading = true\n        errorMessage = nil\n        Task {\n            do {\n                let result = try await apiService.fetchProducts()\n                await MainActor.run {\n                    self.products = result\n                    self.isLoading = false\n                }\n            } catch {\n                await MainActor.run {\n                    self.errorMessage = error.localizedDescription\n                    self.isLoading = false\n                }\n            }\n        }\n    }\n    \n    func deleteProduct(_ product: Product) {\n        Task {\n            try? await apiService.delete(product.id)\n            await MainActor.run {\n                self.products.removeAll { $0.id == product.id }\n            }\n        }\n    }\n}\n\nstruct ProductListView: View {\n    @StateObject var viewModel = ProductListViewModel()\n    \n    var body: some View {\n        NavigationStack {\n            List {\n                ForEach(viewModel.filteredProducts) { product in\n                    ProductRow(product: product)\n                }\n                .onDelete { indexSet in\n                    for index in indexSet {\n                        viewModel.deleteProduct(viewModel.filteredProducts[index])\n                    }\n                }\n            }\n            .searchable(text: $viewModel.searchText)\n            .refreshable { viewModel.loadProducts() }\n            .overlay {\n                if viewModel.isLoading { ProgressView() }\n            }\n            .alert(\"Error\", isPresented: .constant(viewModel.errorMessage != nil)) {\n                Button(\"OK\") { viewModel.errorMessage = nil }\n            } message: {\n                Text(viewModel.errorMessage ?? \"\")\n            }\n            .onAppear { viewModel.loadProducts() }\n            .navigationTitle(\"Products\")\n        }\n    }\n}\n\nstruct Product: Identifiable, Equatable, Decodable {\n    let id: UUID\n    let name: String\n    let price: Double\n}\n```",
+      "expected_output": "Full TCA refactor with @Reducer, @ObservableState, @DependencyClient for API, IdentifiedArrayOf, proper effect patterns, and direct store access in the view.",
+      "assertions": [
+        {
+          "id": "RF1.1",
+          "text": "Replaces ObservableObject/StateObject with @Reducer and @ObservableState",
+          "rationale": "Core TCA migration pattern"
+        },
+        {
+          "id": "RF1.2",
+          "text": "Replaces APIService.shared singleton with @DependencyClient struct-of-closures",
+          "discriminating": true,
+          "rationale": "Testable DI replaces untestable singleton"
+        },
+        {
+          "id": "RF1.3",
+          "text": "Uses IdentifiedArrayOf<Product> instead of plain [Product]",
+          "discriminating": true,
+          "rationale": "TCA collection management \u2014 enables forEach composition"
+        },
+        {
+          "id": "RF1.4",
+          "text": "Pre-computes filteredProducts in reducer (stored property) instead of computed property in State",
+          "discriminating": true,
+          "rationale": "Computed properties in State re-evaluate on every scope call"
+        },
+        {
+          "id": "RF1.5",
+          "text": "View uses direct store access (no @StateObject, no WithViewStore)",
+          "rationale": "Modern TCA observation pattern"
+        },
+        {
+          "id": "RF1.6",
+          "text": "Error handling uses .run { } catch: { } pattern with explicit error actions",
+          "rationale": "TCA-idiomatic async error handling"
+        },
+        {
+          "id": "RF1.7",
+          "text": "Delete effect does NOT silently swallow errors (try? removed)",
+          "rationale": "Original code silently ignores delete failures"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "reference": "migration",
+      "category": "refactoring",
+      "name": "pre-1.0-environment-to-modern",
+      "prompt": "Modernize this pre-1.0 TCA code to current TCA (1.7+). Keep all functionality:\n\n```swift\nstruct TodosState: Equatable {\n    var todos: [Todo] = []\n    var isLoading = false\n}\n\nenum TodosAction: Equatable {\n    case onAppear\n    case todosLoaded(Result<[Todo], APIError>)\n    case deleteTodo(IndexSet)\n    case todoDeleted(Result<Bool, APIError>)\n}\n\nstruct TodosEnvironment {\n    var apiClient: APIClient\n    var mainQueue: AnySchedulerOf<DispatchQueue>\n}\n\nlet todosReducer = Reducer<TodosState, TodosAction, TodosEnvironment> { state, action, environment in\n    switch action {\n    case .onAppear:\n        state.isLoading = true\n        return environment.apiClient.fetchTodos()\n            .receive(on: environment.mainQueue)\n            .catchToEffect(TodosAction.todosLoaded)\n    case .todosLoaded(.success(let todos)):\n        state.isLoading = false\n        state.todos = todos\n        return .none\n    case .todosLoaded(.failure):\n        state.isLoading = false\n        return .none\n    case .deleteTodo(let indexSet):\n        let id = state.todos[indexSet.first!].id\n        state.todos.remove(atOffsets: indexSet)\n        return environment.apiClient.deleteTodo(id)\n            .receive(on: environment.mainQueue)\n            .catchToEffect(TodosAction.todoDeleted)\n    case .todoDeleted:\n        return .none\n    }\n}\n\nstruct TodosView: View {\n    let store: Store<TodosState, TodosAction>\n    \n    var body: some View {\n        WithViewStore(store, observe: { $0 }) { viewStore in\n            List {\n                ForEach(viewStore.todos) { todo in\n                    Text(todo.title)\n                }\n                .onDelete { viewStore.send(.deleteTodo($0)) }\n            }\n            .onAppear { viewStore.send(.onAppear) }\n            .overlay {\n                if viewStore.isLoading { ProgressView() }\n            }\n        }\n    }\n}\n```",
+      "expected_output": "Full modernization: @Reducer macro, @ObservableState, @Dependency replacing Environment, .run replacing Combine effects, no WithViewStore.",
+      "assertions": [
+        {
+          "id": "RF2.1",
+          "text": "Replaces Reducer<State, Action, Environment> with @Reducer struct containing nested State/Action",
+          "rationale": "Core structural migration"
+        },
+        {
+          "id": "RF2.2",
+          "text": "Replaces Environment with @Dependency for API client and clock",
+          "discriminating": true,
+          "rationale": "Dependency injection system completely changed in TCA 1.0"
+        },
+        {
+          "id": "RF2.3",
+          "text": "Replaces Combine .catchToEffect with .run { send in } async/await",
+          "discriminating": true,
+          "rationale": "Combine effects are obsolete \u2014 .run is the modern API"
+        },
+        {
+          "id": "RF2.4",
+          "text": "Replaces AnySchedulerOf<DispatchQueue> with @Dependency(\\.continuousClock)",
+          "discriminating": true,
+          "rationale": "Combine schedulers replaced by Clock protocol"
+        },
+        {
+          "id": "RF2.5",
+          "text": "Removes Equatable from Action enum",
+          "rationale": "Unnecessary since TCA 1.4"
+        },
+        {
+          "id": "RF2.6",
+          "text": "State/Action defined inside @Reducer struct body, not standalone types",
+          "rationale": "Macro requirement"
+        },
+        {
+          "id": "RF2.7",
+          "text": "Removes WithViewStore \u2014 uses direct store access with @Bindable or let store",
+          "rationale": "WithViewStore deprecated in 1.7+"
+        },
+        {
+          "id": "RF2.8",
+          "text": "Adds @ObservableState to State",
+          "rationale": "Required for modern observation"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "reference": "migration",
+      "category": "refactoring",
+      "name": "observableobject-to-observablestate",
+      "prompt": "Migrate this SwiftUI view and its ObservableObject to TCA with @ObservableState. The view uses @StateObject, @Published, Combine pipelines, and manual MainActor dispatching:\n\n```swift\nclass TimerViewModel: ObservableObject {\n    @Published var count = 0\n    @Published var isRunning = false\n    @Published var history: [Int] = []\n    \n    private var timer: AnyCancellable?\n    \n    func startTimer() {\n        isRunning = true\n        timer = Timer.publish(every: 1, on: .main, in: .common)\n            .autoconnect()\n            .sink { [weak self] _ in\n                self?.count += 1\n            }\n    }\n    \n    func stopTimer() {\n        timer?.cancel()\n        timer = nil\n        isRunning = false\n    }\n    \n    func resetTimer() {\n        stopTimer()\n        history.append(count)\n        count = 0\n    }\n}\n\nstruct TimerView: View {\n    @StateObject private var viewModel = TimerViewModel()\n    \n    var body: some View {\n        VStack(spacing: 20) {\n            Text(\"\\(viewModel.count)\")\n                .font(.system(size: 72, design: .monospaced))\n            \n            HStack {\n                Button(viewModel.isRunning ? \"Stop\" : \"Start\") {\n                    viewModel.isRunning ? viewModel.stopTimer() : viewModel.startTimer()\n                }\n                Button(\"Reset\") { viewModel.resetTimer() }\n                    .disabled(!viewModel.isRunning && viewModel.count == 0)\n            }\n            \n            if !viewModel.history.isEmpty {\n                Section(\"History\") {\n                    ForEach(viewModel.history.indices, id: \\\\.self) { i in\n                        Text(\"Run \\(i+1): \\(viewModel.history[i])s\")\n                    }\n                }\n            }\n        }\n        .onDisappear { viewModel.stopTimer() }\n    }\n}\n```",
+      "expected_output": "TCA reducer with @ObservableState, timer via @Dependency(\\.continuousClock) with for await loop, proper cancellation on stop/disappear, history managed in state.",
+      "assertions": [
+        {
+          "id": "RF3.1",
+          "text": "Replaces ObservableObject + @Published with @Reducer struct and @ObservableState State",
+          "rationale": "Core migration pattern"
+        },
+        {
+          "id": "RF3.2",
+          "text": "Replaces Timer.publish Combine pipeline with @Dependency(\\.continuousClock) and for await clock.timer()",
+          "discriminating": true,
+          "rationale": "TCA-idiomatic timer \u2014 testable with TestClock"
+        },
+        {
+          "id": "RF3.3",
+          "text": "Uses .cancellable(id:) for the timer effect with enum CancelID (not empty enum)",
+          "discriminating": true,
+          "rationale": "Proper effect lifecycle management with non-empty cancel ID"
+        },
+        {
+          "id": "RF3.4",
+          "text": "Cancels timer on both stopTimer action AND onDisappear",
+          "rationale": "Original cleanup behavior preserved"
+        },
+        {
+          "id": "RF3.5",
+          "text": "View removes @StateObject \u2014 uses let store or @Bindable var store",
+          "rationale": "TCA owns state, not SwiftUI"
+        },
+        {
+          "id": "RF3.6",
+          "text": "No weak self, no AnyCancellable \u2014 pure value-type state + effect cancellation",
+          "discriminating": true,
+          "rationale": "TCA eliminates reference-type memory management entirely"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "reference": "effects",
+      "category": "refactoring",
+      "name": "combine-effects-to-modern",
+      "prompt": "Refactor these Combine-based TCA effects to modern async/await effects. Keep all functionality:\n\n```swift\n// Old TCA Combine effects (pre-0.40)\ncase .searchQueryChanged(let query):\n    state.searchQuery = query\n    guard !query.isEmpty else {\n        state.results = []\n        return .cancel(id: SearchCancelID.self)\n    }\n    return Effect(value: .performSearch)\n        .debounce(id: SearchCancelID.self, for: 0.3, scheduler: environment.mainQueue)\n\ncase .performSearch:\n    return environment.searchClient.search(state.searchQuery)\n        .receive(on: environment.mainQueue)\n        .map(Action.searchResults)\n        .catch { Just(.searchFailed($0)) }\n        .eraseToEffect()\n\ncase .loadAndTransform:\n    return Effect.concatenate(\n        Effect(value: .setLoading(true)),\n        environment.apiClient.fetch()\n            .receive(on: environment.mainQueue)\n            .map(Action.dataLoaded)\n            .catch { Just(.loadFailed($0)) }\n            .eraseToEffect(),\n        Effect(value: .setLoading(false))\n    )\n\ncase .fireAnalytics:\n    return Effect.fireAndForget {\n        environment.analytics.track(\"page_viewed\")\n    }\n\nstruct SearchCancelID: Hashable {}\n```",
+      "expected_output": "Modern async/await effects: .run with clock.sleep for debounce, .run with try/catch, inline sequential logic, .run { _ in } for fire-and-forget, enum CancelID.",
+      "assertions": [
+        {
+          "id": "RF4.1",
+          "text": "Replaces Effect(value:).debounce with clock.sleep + .cancellable(cancelInFlight: true)",
+          "discriminating": true,
+          "rationale": "Combine debounce \u2192 async sleep + cancel-in-flight pattern"
+        },
+        {
+          "id": "RF4.2",
+          "text": "Replaces .eraseToEffect() / .map / .catch chain with .run { send in } and try/catch",
+          "rationale": "Modern async/await effect API"
+        },
+        {
+          "id": "RF4.3",
+          "text": "Replaces Effect.concatenate of Effect(value:) with either inline .run or .concatenate(.send, .run, .send) pattern",
+          "rationale": "Both inline sequential and .concatenate with .send are valid modern TCA patterns"
+        },
+        {
+          "id": "RF4.4",
+          "text": "Replaces Effect.fireAndForget with .run { _ in }",
+          "rationale": "Modern fire-and-forget pattern"
+        },
+        {
+          "id": "RF4.5",
+          "text": "Replaces struct SearchCancelID: Hashable with enum CancelID { case search }",
+          "discriminating": true,
+          "rationale": "Empty structs also pruned in release builds \u2014 same as empty enums"
+        },
+        {
+          "id": "RF4.6",
+          "text": "Replaces environment.mainQueue with @Dependency(\\.continuousClock)",
+          "rationale": "Combine schedulers \u2192 Clock protocol"
+        },
+        {
+          "id": "RF4.7",
+          "text": "Defines search/API dependencies using @DependencyClient struct-of-closures (not a free variable or global reference)",
+          "discriminating": true,
+          "rationale": "Complete migration requires proper DI — baseline often leaves dependencies as uninjected references"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "reference": "reducer-architecture",
+      "category": "refactoring",
+      "name": "extract-child-from-god-reducer",
+      "prompt": "Extract the settings logic from this god reducer into a separate SettingsFeature child. The settings section handles theme, notifications, and logout with an alert. Keep the parent AppFeature composing it:\n\n```swift\n@Reducer\nstruct AppFeature {\n    @ObservableState\n    struct State: Equatable {\n        // Tab state\n        var selectedTab: Tab = .home\n        var homeItems: [Item] = []\n        \n        // Settings state (extract this)\n        var isDarkMode = false\n        var notificationsEnabled = true\n        var showLogoutAlert = false\n        var settingsIsLoading = false\n        \n        enum Tab { case home, settings }\n    }\n    \n    enum Action {\n        // Home actions\n        case selectTab(State.Tab)\n        case homeItemsLoaded([Item])\n        \n        // Settings actions (extract these)\n        case toggleDarkMode\n        case toggleNotifications\n        case logoutTapped\n        case logoutConfirmed\n        case logoutCancelled\n        case settingsSaved(Result<Void, Error>)\n    }\n    \n    @Dependency(\\.apiClient) var apiClient\n    @Dependency(\\.userDefaults) var userDefaults\n    \n    var body: some ReducerOf<Self> {\n        Reduce { state, action in\n            switch action {\n            case .selectTab(let tab):\n                state.selectedTab = tab\n                return .none\n            case .homeItemsLoaded(let items):\n                state.homeItems = items\n                return .none\n            case .toggleDarkMode:\n                state.isDarkMode.toggle()\n                return .run { [isDark = state.isDarkMode] _ in\n                    await userDefaults.set(isDark, forKey: \"darkMode\")\n                }\n            case .toggleNotifications:\n                state.notificationsEnabled.toggle()\n                return .run { [enabled = state.notificationsEnabled] send in\n                    try await apiClient.updateNotificationSettings(enabled)\n                    await send(.settingsSaved(.success(())))\n                } catch: { error, send in\n                    await send(.settingsSaved(.failure(error)))\n                }\n            case .logoutTapped:\n                state.showLogoutAlert = true\n                return .none\n            case .logoutConfirmed:\n                state.showLogoutAlert = false\n                state.settingsIsLoading = true\n                return .run { send in\n                    try await apiClient.logout()\n                    // Reset everything\n                }\n            case .logoutCancelled:\n                state.showLogoutAlert = false\n                return .none\n            case .settingsSaved(.success):\n                return .none\n            case .settingsSaved(.failure):\n                state.notificationsEnabled.toggle() // Revert\n                return .none\n            }\n        }\n    }\n}\n```",
+      "expected_output": "SettingsFeature extracted as separate @Reducer with own State/Action/dependencies. AppFeature composes via Scope. Logout communicated via delegate action. Alert uses AlertState.",
+      "assertions": [
+        {
+          "id": "RF5.1",
+          "text": "Extracts a separate @Reducer struct SettingsFeature with its own State and Action",
+          "rationale": "Core decomposition \u2014 each feature is independently testable"
+        },
+        {
+          "id": "RF5.2",
+          "text": "Uses delegate action for logout (child sends .delegate(.didLogout), parent handles it)",
+          "discriminating": true,
+          "rationale": "Child should not know about app-level reset logic"
+        },
+        {
+          "id": "RF5.3",
+          "text": "Parent composes child via Scope(state: \\.settings, action: \\.settings)",
+          "rationale": "Correct composition for always-present child"
+        },
+        {
+          "id": "RF5.4",
+          "text": "Replaces Bool showLogoutAlert with AlertState<Action> or @Presents alert",
+          "discriminating": true,
+          "rationale": "Type-safe alerts instead of raw Bool + .alert modifier"
+        },
+        {
+          "id": "RF5.5",
+          "text": "Settings dependencies (@Dependency) live in SettingsFeature, not AppFeature",
+          "discriminating": true,
+          "rationale": "Dependencies follow the feature that uses them"
+        },
+        {
+          "id": "RF5.6",
+          "text": "Parent only observes .settings(.delegate(...)) actions, not internal settings actions",
+          "rationale": "Encapsulation boundary maintained"
+        },
+        {
+          "id": "RF5.7",
+          "text": "Three-category action pattern (view/internal/delegate) in SettingsFeature",
+          "rationale": "Best practice for any non-trivial feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,300 @@
+{
+  "skill_name": "ios-security-audit",
+  "methodology": "discriminating-only",
+  "topics": [
+    "storage",
+    "crypto",
+    "network",
+    "platform",
+    "objc",
+    "compliance",
+    "appstore",
+    "audit-process"
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "topic": "storage",
+      "prompt": "What's the security issue with this code?\n\n```swift\nUserDefaults.standard.set(authToken, forKey: \"userAuthToken\")\n```",
+      "assertions": [
+        {
+          "id": "S1.3",
+          "text": "references a relevant OWASP MASVS storage control"
+        }
+      ],
+      "name": "storage-simple"
+    },
+    {
+      "id": 2,
+      "topic": "storage",
+      "prompt": "Audit this code for storage security issues. Is everything a finding?\n\n```swift\nclass SettingsManager {\n    func savePreferences(theme: String, authToken: String, hasSeenOnboarding: Bool) {\n        UserDefaults.standard.set(theme, forKey: \"userTheme\")\n        UserDefaults.standard.set(authToken, forKey: \"accessToken\")\n        UserDefaults.standard.set(hasSeenOnboarding, forKey: \"onboardingComplete\")\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "S2.3",
+          "text": "provides Keychain fix with kSecAttrAccessible recommendation"
+        }
+      ],
+      "name": "storage-medium"
+    },
+    {
+      "id": 3,
+      "topic": "storage",
+      "prompt": "This is an L2 fintech app. Audit the Keychain usage:\n\n```swift\nfunc storeCredential(_ token: String) {\n    let query: [String: Any] = [\n        kSecClass as String: kSecClassGenericPassword,\n        kSecAttrAccount as String: \"userToken\",\n        kSecValueData as String: token.data(using: .utf8)!,\n        kSecAttrAccessible as String: kSecAttrAccessibleAlways\n    ]\n    SecItemAdd(query as CFDictionary, nil)\n}\n```",
+      "assertions": [
+        {
+          "id": "S3.2",
+          "text": "provides kSecAttrAccessible hierarchy (most to least secure)"
+        },
+        {
+          "id": "S3.4",
+          "text": "references a relevant OWASP MASVS storage control and weakness"
+        }
+      ],
+      "name": "storage-complex"
+    },
+    {
+      "id": 4,
+      "topic": "crypto",
+      "prompt": "What's the security issue?\n\n```swift\nlet apiKey = \"sk-proj-abc123def456\"\n```",
+      "assertions": [
+        {
+          "id": "CR1.2",
+          "text": "mentions extractable from binary via strings command"
+        }
+      ],
+      "name": "crypto-simple"
+    },
+    {
+      "id": 5,
+      "topic": "crypto",
+      "prompt": "Review this encryption code:\n\n```swift\nlet key = \"MySecretKey12345\".data(using: .utf8)!\nlet iv = Data(repeating: 0, count: 16)\nlet symmetricKey = SymmetricKey(data: key)\nlet sealedBox = try AES.GCM.seal(plaintext, using: symmetricKey, nonce: AES.GCM.Nonce(data: iv))\n```",
+      "assertions": [
+        {
+          "id": "CR2.3",
+          "text": "recommends Secure Enclave or Keychain for key storage"
+        }
+      ],
+      "name": "crypto-medium"
+    },
+    {
+      "id": 6,
+      "topic": "crypto",
+      "prompt": "Audit the cryptography in this Objective-C code:\n\n```objc\n- (NSData *)encryptData:(NSData *)data withPassword:(NSString *)password {\n    char keyPtr[kCCKeySizeAES128];\n    [password getCString:keyPtr maxLength:sizeof(keyPtr) encoding:NSUTF8StringEncoding];\n    \n    size_t outLength;\n    NSMutableData *outData = [NSMutableData dataWithLength:data.length + kCCBlockSizeAES128];\n    \n    CCCrypt(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode | kCCOptionPKCS7Padding,\n            keyPtr, kCCKeySizeAES128, NULL,\n            data.bytes, data.length, outData.mutableBytes, outData.length, &outLength);\n    \n    return outData;\n}\n```",
+      "assertions": [
+        {
+          "id": "CR3.5",
+          "text": "references a relevant OWASP MASVS crypto control"
+        },
+        {
+          "id": "CR3.7",
+          "text": "secure rewrite uses memset_s to zero out key material after use"
+        }
+      ],
+      "name": "crypto-complex"
+    },
+    {
+      "id": 7,
+      "topic": "network",
+      "prompt": "This L2 banking app uses URLSession. Is certificate pinning implemented?\n\n```swift\nclass NetworkService {\n    private let session = URLSession(configuration: .default)\n    \n    func fetchAccounts() async throws -> [Account] {\n        let (data, _) = try await session.data(from: accountsURL)\n        return try JSONDecoder().decode([Account].self, from: data)\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "N2.3",
+          "text": "provides URLSessionDelegate implementation with certificate validation"
+        },
+        {
+          "id": "N2.4",
+          "text": "references a relevant OWASP MASVS network control"
+        },
+        {
+          "id": "N2.5",
+          "text": "includes a relevant OWASP MASWE weakness identifier"
+        }
+      ],
+      "name": "network-medium"
+    },
+    {
+      "id": 8,
+      "topic": "platform",
+      "prompt": "What's the security concern with UIWebView?\n\n```swift\nlet webView = UIWebView(frame: view.bounds)\nwebView.loadRequest(URLRequest(url: url))\n```",
+      "assertions": [
+        {
+          "id": "P1.4",
+          "text": "references a relevant OWASP MASWE WebView weakness"
+        }
+      ],
+      "name": "platform-simple"
+    },
+    {
+      "id": 9,
+      "topic": "platform",
+      "prompt": "Audit this URL scheme handler:\n\n```swift\nfunc application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any]) -> Bool {\n    if url.scheme == \"myapp\" {\n        if url.host == \"payment\" {\n            let amount = url.queryParameters[\"amount\"]!\n            processPayment(amount: Double(amount)!)\n        }\n    }\n    return true\n}\n```",
+      "assertions": [
+        {
+          "id": "P2.4",
+          "text": "references a relevant OWASP MASVS platform or code control"
+        }
+      ],
+      "name": "platform-medium"
+    },
+    {
+      "id": 10,
+      "topic": "platform",
+      "prompt": "Audit the WebView configuration for a banking app:\n\n```swift\nclass WebViewController: UIViewController {\n    private var webView: WKWebView!\n    \n    override func viewDidLoad() {\n        super.viewDidLoad()\n        let config = WKWebViewConfiguration()\n        config.preferences.javaScriptEnabled = true\n        config.preferences.javaScriptCanOpenWindowsAutomatically = true\n        webView = WKWebView(frame: view.bounds, configuration: config)\n        \n        let script = WKUserScript(source: \"window.token = '\\(authToken)'\", injectionTime: .atDocumentStart, forMainFrameOnly: false)\n        config.userContentController.addUserScript(script)\n    }\n    \n    func loadPage(_ url: URL) {\n        webView.load(URLRequest(url: url))\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "P3.5",
+          "text": "references a relevant OWASP MASVS platform control"
+        },
+        {
+          "id": "P3.6",
+          "text": "recommends .nonPersistent() websiteDataStore to prevent caching sensitive content"
+        },
+        {
+          "id": "P3.7",
+          "text": "provides explicit release recommendation (BLOCK for banking app)"
+        }
+      ],
+      "name": "platform-complex"
+    },
+    {
+      "id": 11,
+      "topic": "objc",
+      "prompt": "Audit this Objective-C deserialization code:\n\n```objc\n- (UserProfile *)loadProfile {\n    NSData *data = [NSData dataWithContentsOfFile:self.archivePath];\n    return [NSKeyedUnarchiver unarchiveObjectWithData:data];\n}\n```",
+      "assertions": [
+        {
+          "id": "O2.1",
+          "text": "flags unarchiveObjectWithData as critical severity"
+        },
+        {
+          "id": "O2.3",
+          "text": "recommends unarchivedObjectOfClass:fromData:error:"
+        },
+        {
+          "id": "O2.4",
+          "text": "references a relevant OWASP MASVS code control"
+        },
+        {
+          "id": "O2.5",
+          "text": "warns about false security of decodeObjectForKey: without type-safe class parameter"
+        },
+        {
+          "id": "O2.6",
+          "text": "shows NSSecureCoding implementation with supportsSecureCoding and decodeObjectOfClass:forKey:"
+        }
+      ],
+      "name": "objc-medium"
+    },
+    {
+      "id": 12,
+      "topic": "objc",
+      "prompt": "This is a mixed Swift/ObjC codebase. Audit the Objective-C runtime attack surface:\n\n```objc\n// SecurityManager.m\n@implementation SecurityManager\n\n+ (void)load {\n    static dispatch_once_t onceToken;\n    dispatch_once(&onceToken, ^{\n        [self swizzleMethod];\n    });\n}\n\n+ (void)swizzleMethod {\n    Method original = class_getInstanceMethod([UIViewController class], @selector(viewDidLoad));\n    Method swizzled = class_getInstanceMethod(self, @selector(swizzled_viewDidLoad));\n    method_exchangeImplementations(original, swizzled);\n}\n\n- (BOOL)validateLicense:(NSString *)key {\n    return [key hasPrefix:@\"VALID-\"];\n}\n\n@end\n```",
+      "assertions": [
+        {
+          "id": "O3.3",
+          "text": "recommends moving security logic to Swift (no ObjC runtime exposure)"
+        },
+        {
+          "id": "O3.4",
+          "text": "references OWASP MASVS resilience controls for anti-tampering"
+        },
+        {
+          "id": "O3.5",
+          "text": "mentions runtime hooking tools (e.g., Frida, Cycript) can hook ObjC methods"
+        }
+      ],
+      "name": "objc-complex"
+    },
+    {
+      "id": 13,
+      "topic": "compliance",
+      "prompt": "What compliance standard requires encryption of health data at rest?",
+      "assertions": [
+        {
+          "id": "CM1.3",
+          "text": "references specific HIPAA technical safeguard section for encryption"
+        }
+      ],
+      "name": "compliance-simple"
+    },
+    {
+      "id": 14,
+      "topic": "compliance",
+      "prompt": "A payment app stores credit card numbers. What MASVS controls and compliance requirements apply?\n\n```swift\nfunc saveCard(_ cardNumber: String) {\n    let encrypted = try AES.GCM.seal(cardNumber.data(using: .utf8)!, using: key)\n    UserDefaults.standard.set(encrypted.combined, forKey: \"savedCard\")\n}\n```",
+      "assertions": [
+        {
+          "id": "CM2.3",
+          "text": "recommends Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly"
+        },
+        {
+          "id": "CM2.4",
+          "text": "mentions PCI DSS requirement to render PAN unreadable"
+        }
+      ],
+      "name": "compliance-medium"
+    },
+    {
+      "id": 15,
+      "topic": "compliance",
+      "prompt": "This L2 healthcare app needs HIPAA compliance. Perform a compliance gap analysis:\n\n```swift\nclass PatientDataManager {\n    func saveRecord(_ record: PatientRecord) {\n        let data = try JSONEncoder().encode(record)\n        try data.write(to: documentURL, options: .completeFileProtection)\n    }\n    \n    func fetchRecords() async throws -> [PatientRecord] {\n        let (data, _) = try await URLSession.shared.data(from: apiURL)\n        return try JSONDecoder().decode([PatientRecord].self, from: data)\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "CM3.3",
+          "text": "maps findings to HIPAA technical safeguards (access controls and audit trails)"
+        },
+        {
+          "id": "CM3.4",
+          "text": "identifies missing biometric or strong auth with server binding for L2"
+        },
+        {
+          "id": "CM3.5",
+          "text": "maps findings to specific HIPAA technical safeguards"
+        },
+        {
+          "id": "CM3.6",
+          "text": "notes URLSession.shared cannot have custom delegate (must create new URLSession)"
+        },
+        {
+          "id": "CM3.7",
+          "text": "provides SecAccessControl code for biometric-bound Keychain credential"
+        }
+      ],
+      "name": "compliance-complex"
+    },
+    {
+      "id": 16,
+      "topic": "appstore",
+      "prompt": "Check this app for App Store rejection risks:\n\n- Uses AdSupport framework\n- No ATTrackingManager.requestTrackingAuthorization call\n- No NSUserTrackingUsageDescription in Info.plist",
+      "assertions": [
+        {
+          "id": "AS2.4",
+          "text": "references specific App Store Review Guideline for privacy/tracking"
+        }
+      ],
+      "name": "appstore-medium"
+    },
+    {
+      "id": 17,
+      "topic": "audit-process",
+      "prompt": "Generate a security audit finding for this code in proper format:\n\n```swift\n// AuthService.swift line 42\nUserDefaults.standard.set(refreshToken, forKey: \"refreshToken\")\n```",
+      "assertions": [
+        {
+          "id": "A3.2",
+          "text": "maps to a relevant OWASP MASVS storage control"
+        },
+        {
+          "id": "A3.3",
+          "text": "includes a relevant OWASP MASWE weakness identifier"
+        },
+        {
+          "id": "A3.6",
+          "text": "classifies refresh token in UserDefaults as CRITICAL (not HIGH)"
+        },
+        {
+          "id": "A3.7",
+          "text": "includes migration code for existing UserDefaults installations"
+        }
+      ],
+      "name": "audit-process-complex"
+    }
+  ]
+}

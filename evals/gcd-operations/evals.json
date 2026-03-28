@@ -1,0 +1,219 @@
+{
+  "skill_name": "gcd-operationqueue",
+  "methodology": "Cleaned eval set v3. Removed 51 assertions that passed 100% across all 6 variants (3 models x with/without skill). Removed library-name-dropping assertions (Alamofire bug, Kingfisher/SDWebImage convergence). Removed tangential assertions (Combine .receive(on:), NSLock-vs-os_unfair_lock cross-reference trivia). Softened taxonomy assertions to test behavior not labels. Removed evals with 0 remaining assertions. Remaining assertions discriminate between with-skill and without-skill responses.",
+  "eval_structure": "reference-file x difficulty (simple/medium/complex)",
+  "evals": [
+    {
+      "id": 2,
+      "reference": "queue-creation",
+      "name": "queue-creation-medium",
+      "prompt": "Our app has 50+ features and each creates its own DispatchQueue.global().async calls. We're seeing sluggish performance. What's wrong and how should we restructure?\n\n```swift\n// Feature A\nDispatchQueue.global().async { fetchUserData() }\n\n// Feature B  \nDispatchQueue.global().async { processImages() }\n\n// Feature C\nDispatchQueue.global().async { syncDatabase() }\n\n// ... 47 more features doing the same\n```",
+      "expected_output": "Identifies: (1) Scattered global() calls lead to thread explosion and no control, (2) Recommends consolidating to 3-4 named subsystem queues, (3) Should use target queue hierarchies to funnel work, (4) Notes barriers are silently ignored on global queues.",
+      "assertions": [
+        {
+          "id": "Q2.2",
+          "text": "Recommends consolidating to a small number (3-4) of named subsystem queues",
+          "rationale": "Apple-specific architectural guidance from skill"
+        },
+        {
+          "id": "Q2.3",
+          "text": "Suggests target queue hierarchies for funneling work",
+          "rationale": "Advanced pattern from skill"
+        },
+        {
+          "id": "Q2.4",
+          "text": "Notes that barriers are silently ignored on global queues",
+          "rationale": "Critical GCD pitfall from skill"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "reference": "queue-creation",
+      "name": "queue-creation-complex",
+      "prompt": "Review this queue architecture. We're seeing intermittent deadlocks and some work never executes:\n\n```swift\nclass NetworkSubsystem {\n    let rootQueue = DispatchQueue(label: \"com.app.network\")\n    let requestQueue = DispatchQueue(label: \"com.app.network.request\", target: rootQueue)\n    let responseQueue = DispatchQueue(label: \"com.app.network.response\", target: rootQueue)\n    \n    func fetchData(completion: @escaping (Data) -> Void) {\n        rootQueue.sync {\n            requestQueue.sync {  // Configure request\n                let data = performRequest()\n                responseQueue.async {\n                    completion(data)\n                }\n            }\n        }\n    }\n}\n\nclass BackgroundProcessor {\n    let queue = DispatchQueue(label: \"com.app.background\", qos: .background)\n    \n    func processUserVisibleThumbnails() {\n        queue.async {\n            generateThumbnails()  // User sees these immediately\n        }\n    }\n}\n```",
+      "expected_output": "Identifies: (1) Target queue sync cycle deadlock - requestQueue targets rootQueue, so sync from rootQueue to requestQueue is nested sync on same underlying queue, (2) .background QoS inappropriate for user-visible work - may halt in Low Power Mode.",
+      "assertions": [
+        {
+          "id": "Q3.3",
+          "text": "Mentions .background QoS may halt or be severely throttled in Low Power Mode",
+          "rationale": "Apple-specific detail from skill"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "reference": "deadlocks",
+      "name": "deadlocks-simple",
+      "prompt": "Why might this code hang?\n\n```swift\nfunc refreshUI() {\n    DispatchQueue.main.sync {\n        tableView.reloadData()\n    }\n}\n```",
+      "expected_output": "If called from main thread, main.sync deadlocks - main queue is serial, sync blocks waiting for the block to execute on the same queue that's already blocked.",
+      "assertions": [
+        {
+          "id": "D1.2",
+          "text": "Mentions libdispatch detects this case and crashes with EXC_BAD_INSTRUCTION",
+          "rationale": "Skill-specific detail about libdispatch runtime detection"
+        },
+        {
+          "id": "D1.3",
+          "text": "Suggests dispatchPrecondition for early detection of queue violations",
+          "rationale": "Proactive debugging pattern from skill"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "reference": "deadlocks",
+      "name": "deadlocks-medium",
+      "prompt": "This code sometimes deadlocks. Find the pattern:\n\n```swift\nlet cacheQueue = DispatchQueue(label: \"com.app.cache\")\n\nfunc readFromCache() -> Data? {\n    cacheQueue.sync {\n        if needsRefresh() {\n            return refreshCache()  // This calls writeToCache internally\n        }\n        return cachedData\n    }\n}\n\nfunc writeToCache(_ data: Data) {\n    cacheQueue.sync {\n        cachedData = data\n    }\n}\n```",
+      "expected_output": "Identifies nested sync on same serial queue - readFromCache holds cacheQueue, calls refreshCache which calls writeToCache which tries to sync on cacheQueue again.",
+      "assertions": [
+        {
+          "id": "D2.3",
+          "text": "Suggests dispatchPrecondition(.notOnQueue) to detect nested sync violations during development",
+          "rationale": "Skill's proactive debugging pattern"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "reference": "deadlocks",
+      "name": "deadlocks-complex",
+      "prompt": "Our app freezes randomly. Multiple threads are involved. Find all deadlock risks:\n\n```swift\nclass ResourceManager {\n    let queueA = DispatchQueue(label: \"com.app.resourceA\")\n    let queueB = DispatchQueue(label: \"com.app.resourceB\")\n    \n    func operationFromFeatureX() {\n        queueA.sync {\n            prepareA()\n            queueB.sync {\n                useAandB()\n            }\n        }\n    }\n    \n    func operationFromFeatureY() {\n        queueB.sync {\n            prepareB()\n            queueA.sync {\n                useAandB()\n            }\n        }\n    }\n}\n\nclass DataLoader {\n    func loadAllData(completion: @escaping ([Data]) -> Void) {\n        let group = DispatchGroup()\n        var results: [Data] = []\n        \n        for url in urls {\n            group.enter()\n            fetchAsync(url) { data in\n                results.append(data)\n                group.leave()\n            }\n        }\n        \n        group.wait()  // Called from main thread\n        completion(results)\n    }\n}\n```",
+      "expected_output": "Identifies: (1) ABBA lock ordering deadlock, (2) group.wait() on main thread risks deadlock, (3) results array data race, (4) recommends defer { group.leave() } pattern.",
+      "assertions": [
+        {
+          "id": "D3.4",
+          "text": "Recommends defer { group.leave() } pattern to guarantee leave on all code paths",
+          "rationale": "Skill's defensive DispatchGroup pattern"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "reference": "thread-safety",
+      "name": "thread-safety-simple",
+      "prompt": "Is this thread-safe counter correct?\n\n```swift\nclass Counter {\n    private let lock = NSLock()\n    private var value = 0\n    \n    func increment() {\n        lock.lock()\n        value += 1\n        lock.unlock()\n    }\n    \n    func get() -> Int {\n        lock.lock()\n        defer { lock.unlock() }\n        return value\n    }\n}\n```",
+      "expected_output": "This is correct. NSLock properly protects both read and write. Skill adds detail about priority donation and modern alternatives.",
+      "assertions": [
+        {
+          "id": "T1.2",
+          "text": "Mentions NSLock provides priority donation (via pthread_mutex_t)",
+          "rationale": "Skill-specific lock selection detail"
+        },
+        {
+          "id": "T1.3",
+          "text": "Suggests OSAllocatedUnfairLock as alternative for iOS 16+",
+          "rationale": "Skill's modern lock recommendation"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "reference": "thread-safety",
+      "name": "thread-safety-complex",
+      "prompt": "Review this thread-safe collection. It's supposed to allow concurrent reads but exclusive writes. Sometimes writes don't take effect:\n\n```swift\nfinal class ThreadSafeCache<Key: Hashable, Value> {\n    private var storage: [Key: Value] = [:]\n    \n    func get(_ key: Key) -> Value? {\n        DispatchQueue.global().sync {\n            storage[key]\n        }\n    }\n    \n    func set(_ key: Key, value: Value) {\n        DispatchQueue.global().async(flags: .barrier) {\n            self.storage[key] = value\n        }\n    }\n    \n    var count: Int {\n        DispatchQueue.global().sync { storage.count }\n    }\n}\n```",
+      "expected_output": "Identifies: (1) Barriers on global queue are silently ignored, (2) Must use custom concurrent queue, (3) global() calls may return different queue instances.",
+      "assertions": [
+        {
+          "id": "T3.1",
+          "text": "Identifies barriers on global queue are silently ignored (not just 'need a custom queue')",
+          "rationale": "Must explicitly state barriers are silently ignored, not just recommend custom queue"
+        },
+        {
+          "id": "T3.3",
+          "text": "Notes global() calls may return different queue instances, so there is no single queue identity",
+          "rationale": "Additional issue with this pattern"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "reference": "thread-explosion",
+      "name": "thread-explosion-medium",
+      "prompt": "Our app gets killed by watchdog. Instruments shows 300+ threads. Review:\n\n```swift\nclass ImageProcessor {\n    func processImages(_ images: [UIImage]) -> [UIImage] {\n        var processed: [UIImage] = []\n        let mutex = DispatchSemaphore(value: 1)\n        \n        for image in images {\n            DispatchQueue.global().async {\n                let result = self.applyFilters(image)  // CPU-heavy, 200ms\n                mutex.wait()\n                processed.append(result)\n                mutex.signal()\n            }\n        }\n        \n        // Wait for all to complete\n        while processed.count < images.count {\n            Thread.sleep(forTimeInterval: 0.1)\n        }\n        return processed\n    }\n}\n```",
+      "expected_output": "Identifies: (1) Thread explosion from unbounded global().async, (2) DispatchSemaphore as mutex lacks priority donation, (3) Should use OperationQueue or concurrentPerform.",
+      "assertions": [
+        {
+          "id": "E2.2",
+          "text": "Identifies DispatchSemaphore used as mutex lacks priority donation, risking priority inversion",
+          "rationale": "Skill explicitly warns against semaphore as mutex"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "reference": "thread-explosion",
+      "name": "thread-explosion-complex",
+      "prompt": "Users report app freezing in Low Power Mode. Our prefetch system also seems sluggish. Analyze:\n\n```swift\nclass ContentPrefetcher {\n    func prefetchUserContent() {\n        DispatchQueue.global(qos: .background).async {\n            self.downloadAvatars()    // 100+ URLs\n            self.downloadThumbnails() // 200+ URLs\n        }\n    }\n    \n    private func downloadAvatars() {\n        for url in avatarURLs {\n            DispatchQueue.global(qos: .background).async {\n                let data = try? Data(contentsOf: url)\n                if let data = data, let image = UIImage(data: data) {\n                    ImageCache.shared.setImage(image, for: url.absoluteString)\n                }\n            }\n        }\n    }\n    \n    private func downloadThumbnails() {\n        for url in thumbnailURLs {\n            DispatchQueue.global(qos: .background).async {\n                let data = try? Data(contentsOf: url)\n                if let data = data, let image = UIImage(data: data) {\n                    ImageCache.shared.setImage(image, for: url.absoluteString)\n                }\n            }\n        }\n    }\n}\n```",
+      "expected_output": "Identifies: (1) Thread explosion from 300+ async calls, (2) .background QoS may halt in Low Power Mode, (3) Scattered global() calls instead of consolidated queues, (4) Data(contentsOf:) is blocking, (5) No concurrency limit.",
+      "assertions": [
+        {
+          "id": "E3.2",
+          "text": "Notes .background QoS may halt or be severely throttled in Low Power Mode",
+          "rationale": "Apple-specific detail from skill"
+        },
+        {
+          "id": "E3.3",
+          "text": "Identifies scattered global() calls as an architectural problem that should be consolidated into named subsystem queues",
+          "rationale": "Skill consolidation guidance"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "reference": "operation-queue",
+      "name": "operation-queue-complex",
+      "prompt": "Operations complete immediately without doing any work. Also seeing random crashes:\n\n```swift\nclass NetworkOperation: Operation {\n    private var _isExecuting = false\n    private var _isFinished = false\n    \n    override var isAsynchronous: Bool { true }\n    override var isExecuting: Bool { _isExecuting }\n    override var isFinished: Bool { _isFinished }\n    \n    override func start() {\n        super.start()  // Call parent implementation\n        _isExecuting = true\n        performNetworkRequest()\n    }\n    \n    private func performNetworkRequest() {\n        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in\n            self?.processData(data)\n            self?.finish()\n        }.resume()\n    }\n    \n    func finish() {\n        willChangeValue(forKey: \"isExecuting\")\n        willChangeValue(forKey: \"isFinished\")\n        _isExecuting = false\n        _isFinished = true\n        didChangeValue(forKey: \"isFinished\")\n        didChangeValue(forKey: \"isExecuting\")\n    }\n}\n\nlet queue = OperationQueue()\nqueue.addOperations(urls.map { NetworkOperation(url: $0) }, waitUntilFinished: false)\n```",
+      "expected_output": "Identifies: (1) super.start() should never be called, (2) State not thread-safe, (3) Missing isCancelled check, (4) Missing maxConcurrentOperationCount, (5) Should override cancel() to cancel in-flight URLSession task.",
+      "assertions": [
+        {
+          "id": "O3.5",
+          "text": "Overrides cancel() to cancel the in-flight URLSession task",
+          "rationale": "Skill's complete Operation lifecycle"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "reference": "data-races",
+      "name": "data-races-medium",
+      "prompt": "Thread Sanitizer reports races. Find them:\n\n```swift\nclass ViewModel {\n    var items: [Item] = []\n    var isLoading = false\n    \n    func loadItems() {\n        isLoading = true\n        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in\n            guard let self = self else { return }\n            let parsed = self.parseItems(data!)\n            self.items = parsed\n            self.isLoading = false\n            self.tableView.reloadData()\n        }.resume()\n    }\n}\n```",
+      "expected_output": "Identifies: (1) data race on items/isLoading, (2) tableView.reloadData() on background, (3) dispatch to main queue, (4) dispatchPrecondition for verification.",
+      "assertions": [
+        {
+          "id": "R2.4",
+          "text": "Suggests dispatchPrecondition(.onQueue(.main)) for verifying main thread at API boundaries",
+          "rationale": "Skill's proactive verification pattern"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "reference": "debugging",
+      "name": "debugging-medium",
+      "prompt": "How can I catch queue violations during development without waiting for crashes in production?\n\n```swift\nfunc updateUI() {\n    // How to assert this is called on main queue?\n    tableView.reloadData()\n}\n\nfunc heavyComputation() {\n    // How to assert this is NOT on main queue?\n    processLargeDataset()\n}\n```",
+      "expected_output": "Use dispatchPrecondition with .onQueue(.main) and .notOnQueue(.main). Removed in release builds.",
+      "assertions": [
+        {
+          "id": "G2.3",
+          "text": "Notes dispatchPrecondition is removed in release builds (zero production overhead)",
+          "rationale": "Important detail about production impact"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "reference": "debugging",
+      "name": "debugging-complex",
+      "prompt": "I see this Thread Sanitizer output. Help me understand what's happening and how to fix it:\n\n```\nWARNING: ThreadSanitizer: data race (pid=12345)\n  Write of size 8 at 0x7ffeefbff5a0 by thread T2:\n    #0 MyApp.ImageCache.store(_:for:) ImageCache.swift:42\n    #1 MyApp.NetworkManager.handleResponse(_:) NetworkManager.swift:87\n\n  Previous read of size 8 at 0x7ffeefbff5a0 by main thread:\n    #0 MyApp.ImageCache.image(for:) ImageCache.swift:28\n    #1 MyApp.ProductCell.configure(with:) ProductCell.swift:15\n\n  Location is heap block of size 64 at 0x7ffeefbff580\n```",
+      "expected_output": "Explains: (1) Two threads accessed same memory, (2) ImageCache.store vs ImageCache.image call paths, (3) Fix with NSLock or serial queue, (4) dispatchPrecondition at API boundaries.",
+      "assertions": [
+        {
+          "id": "G3.4",
+          "text": "Suggests adding dispatchPrecondition at API boundaries for future protection",
+          "rationale": "Proactive debugging pattern from skill"
+        }
+      ]
+    }
+  ]
+}

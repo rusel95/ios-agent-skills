@@ -1,0 +1,29 @@
+{
+  "eval_id": 1,
+  "eval_name": "task-error-swallowing",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Identifies Task {} as a silent error swallowing pattern because Task.init is @discardableResult",
+      "passed": true,
+      "evidence": "Matched: ['silently discard']"
+    },
+    {
+      "text": "Identifies try? as destroying diagnostic information (error type, message, context)",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['try? erases']"
+    },
+    {
+      "text": "Recommends Logger.error() with privacy annotations instead of print()",
+      "passed": false,
+      "evidence": "Matched: ['logger.error'], Missing group containing: ['privacy:']"
+    },
+    {
+      "text": "Recommends reporting to a crash SDK (ErrorReporter.recordNonFatal or Sentry/Crashlytics)",
+      "passed": true,
+      "evidence": "Matched: ['crash report']"
+    }
+  ],
+  "pass_count": 2,
+  "total": 4
+}

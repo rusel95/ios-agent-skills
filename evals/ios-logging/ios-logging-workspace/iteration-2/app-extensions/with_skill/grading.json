@@ -1,0 +1,29 @@
+{
+  "eval_id": 11,
+  "eval_name": "app-extensions",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies that app extensions run in separate processes (not the main app process)",
+      "passed": true,
+      "evidence": "Matched: ['separate process']"
+    },
+    {
+      "text": "States crash SDK must be initialized separately in each extension's entry point",
+      "passed": true,
+      "evidence": "Matched: ['sdk.start', 'extension']"
+    },
+    {
+      "text": "Mentions each extension needs its own dSYM upload configuration",
+      "passed": true,
+      "evidence": "Matched: ['dsym', 'extension']"
+    },
+    {
+      "text": "Recommends disabling autoSessionTracking in extensions",
+      "passed": true,
+      "evidence": "Matched: ['autosessiontracking', 'disable']"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

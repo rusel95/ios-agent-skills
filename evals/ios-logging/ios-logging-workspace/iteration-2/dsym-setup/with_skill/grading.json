@@ -1,0 +1,24 @@
+{
+  "eval_id": 20,
+  "eval_name": "dsym-setup",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies missing dSYM files as the root cause",
+      "passed": true,
+      "evidence": "Matched: ['dsym']"
+    },
+    {
+      "text": "Specifies Build Settings \u2192 Debug Information Format \u2192 'DWARF with dSYM File' for Release configuration",
+      "passed": true,
+      "evidence": "Matched: ['dwarf with dsym']"
+    },
+    {
+      "text": "Mentions dSYMs must be configured for ALL targets (main app AND extensions/widgets)",
+      "passed": true,
+      "evidence": "Matched: ['dsym', 'extension']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

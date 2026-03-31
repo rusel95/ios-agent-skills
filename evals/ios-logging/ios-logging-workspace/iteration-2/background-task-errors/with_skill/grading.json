@@ -1,0 +1,24 @@
+{
+  "eval_id": 17,
+  "eval_name": "background-task-errors",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies Task {} without do/catch \u2014 if performSync throws, setTaskCompleted is never called",
+      "passed": true,
+      "evidence": "Matched: ['task {', 'do/catch']"
+    },
+    {
+      "text": "Recommends adding an expirationHandler to handle system-forced termination",
+      "passed": true,
+      "evidence": "Matched: ['expirationhandler']"
+    },
+    {
+      "text": "Mentions watchdog/SIGKILL for tasks exceeding time limit, detectable only through MetricKit",
+      "passed": true,
+      "evidence": "Matched: ['system kill']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

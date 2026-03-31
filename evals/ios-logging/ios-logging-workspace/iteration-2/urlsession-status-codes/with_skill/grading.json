@@ -1,0 +1,29 @@
+{
+  "eval_id": 7,
+  "eval_name": "urlsession-status-codes",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies that URLSession does not throw for HTTP 4xx/5xx (only transport errors throw)",
+      "passed": true,
+      "evidence": "Matched: ['4xx', 'does not throw']"
+    },
+    {
+      "text": "Adds breadcrumb before the network request",
+      "passed": true,
+      "evidence": "Matched: ['breadcrumb']"
+    },
+    {
+      "text": "Uses Logger with privacy annotations (.public for URL path and status code)",
+      "passed": true,
+      "evidence": "Matched: ['logger.', 'privacy:']"
+    },
+    {
+      "text": "Calls ErrorReporter.recordNonFatal() or SentrySDK.capture() in the error path",
+      "passed": true,
+      "evidence": "Matched: ['errorreporter']"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

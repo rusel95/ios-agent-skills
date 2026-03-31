@@ -75,6 +75,47 @@ Setting up these connections means your AI assistant can investigate production 
 | PII compliance, GDPR/CCPA, privacy manifests | `references/pii-compliance.md` |
 | Centralized error handling, retry patterns, extensions | `references/enterprise-patterns.md` |
 
+## Benchmark Results (Sonnet 4.6)
+
+| Config | Pass | Total | Rate |
+|--------|------|-------|------|
+| **With Skill** | 89 | 91 | 97.8% |
+| **Without Skill** | 58 | 91 | 63.7% |
+| **Delta** | | | **+34.1%** |
+
+### Blind A/B Quality Scoring
+
+**25W 0T 2L** — avg 8.6↑7.4 (with-skill ↑ without-skill)
+
+27 evals scored blind by a judge who doesn't know which response used the skill. Position randomized per eval.
+
+### Strongest Discriminating Topics
+
+| Topic | With Skill | Without Skill | Delta |
+|-------|-----------|--------------|-------|
+| centralized-error-handling | 100% | 0% | +100% |
+| combine-pipeline-death | 100% | 33% | +67% |
+| pii-compliance | 100% | 38% | +63% |
+| crash-sdk-selection | 83% | 33% | +50% |
+| metrickit | 100% | 50% | +50% |
+| retry-with-backoff | 100% | 50% | +50% |
+| task-error-swallowing | 100% | 50% | +50% |
+| urlsession-status-codes | 100% | 50% | +50% |
+
+### Non-Discriminating Topics (baseline already strong)
+
+| Topic | With Skill | Without Skill | Delta |
+|-------|-----------|--------------|-------|
+| background-tasks | 100% | 100% | 0% |
+| cancellation-error | 100% | 100% | 0% |
+| error-reporter-protocol | 100% | 100% | 0% |
+| notification-silent-failures | 100% | 100% | 0% |
+| objc-bridge-edge-case | 100% | 100% | 0% |
+| operational-pii-leaks | 100% | 100% | 0% |
+| print-replacement | 100% | 100% | 0% |
+
+> 27 topic-based evals, 91 discriminating assertions, tested on Claude Sonnet 4.6. See `evals/ios-logging/evals.json` for prompts and assertions, `evals/ios-logging/ios-logging-workspace/iteration-2/benchmark.md` for full results.
+
 ## Compatibility
 
 - iOS 15+ / Swift 5.5+ (modern concurrency)

@@ -1,0 +1,34 @@
+{
+  "eval_id": 3,
+  "eval_name": "audit-viewmodel",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Identifies all three methods have silent failure patterns (try? in loadOrders, try? in placeOrder, unhandled throw in deleteOrder)",
+      "passed": true,
+      "evidence": "Matched: ['loadorders', 'placeorder', 'deleteorder']"
+    },
+    {
+      "text": "Identifies that placeOrder's two try? calls create a logic error (confirmation email sent even if order submission fails)",
+      "passed": true,
+      "evidence": "Matched: ['confirmation email', 'regardless']"
+    },
+    {
+      "text": "Identifies print('Order placed successfully') is invisible in production",
+      "passed": true,
+      "evidence": "Matched: ['print(']"
+    },
+    {
+      "text": "Provides fix with os.Logger using privacy annotations",
+      "passed": false,
+      "evidence": "Matched: ['logger.'], Missing group containing: ['privacy:']"
+    },
+    {
+      "text": "Adds ErrorReporter.recordNonFatal() or crash SDK call in every catch block",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['errorreporter']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 5
+}

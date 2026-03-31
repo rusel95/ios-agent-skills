@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Post-Merge Branch Cleanup Reminder",
+  "description": "After a PR merge tool is used, remind about cleaning up the head branch",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [".*merge_pull_request.*"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A pull request was just merged. Ask the user if they want to delete the head branch that was just merged. If yes, use the appropriate GitHub API to delete the branch. If no, do nothing."
+  }
+}

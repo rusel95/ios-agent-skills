@@ -1,0 +1,24 @@
+{
+  "eval_id": 9,
+  "eval_name": "centralized-error-handling",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Recommends centralized ErrorHandler as ObservableObject with environment injection",
+      "passed": false,
+      "evidence": "Matched: ['observable'], Missing group containing: ['errorhandler']"
+    },
+    {
+      "text": "Recommends CategorizedError protocol with retryable/nonRetryable/requiresLogout categories",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['categorizederror', 'retryable']"
+    },
+    {
+      "text": "Mentions SwiftUI lacks Error Boundaries (unlike React) as motivation for centralized handling",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['error boundar']"
+    }
+  ],
+  "pass_count": 0,
+  "total": 3
+}

@@ -1,0 +1,24 @@
+{
+  "eval_id": 25,
+  "eval_name": "mcp-connectivity",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Recommends Sentry MCP server for querying issues, events, and stack traces from the IDE",
+      "passed": true,
+      "evidence": "Matched: ['mcp', 'sentry']"
+    },
+    {
+      "text": "Provides specific setup instructions (claude mcp add sentry or .mcp.json configuration)",
+      "passed": true,
+      "evidence": "Matched: ['claude mcp add']"
+    },
+    {
+      "text": "Mentions PostHog MCP as alternative/complement for product analytics integration",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['posthog']"
+    }
+  ],
+  "pass_count": 2,
+  "total": 3
+}

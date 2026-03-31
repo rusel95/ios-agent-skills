@@ -9,6 +9,8 @@ metadata:
 
 Production-grade skill for eliminating silent failures in iOS apps. Most production errors don't crash — they vanish through `try?`, `Task {}`, `.replaceError()`, and `print()`-only catch blocks.
 
+AI coding assistants systematically generate observability-blind code because their training data is overwhelmingly tutorial code: `print(error)` in every catch block, `try?` everywhere, `Task {}` with no error handling, no crash SDK integration, no privacy annotations, and zero consideration for MetricKit or PII compliance. This skill intercepts those patterns and enforces observable error handling from the start.
+
 **Logging is the key to debugging.** When a bug appears in production across thousands of devices, you can't attach a debugger. Remote logging through crash reporting SDKs transforms a 3-day debugging mystery into a 15-minute investigation. This skill enforces observable error handling: every error is logged with `os.Logger` (with privacy annotations), reported to a remote crash/analytics SDK, and surfaced to the user or operator.
 
 Three non-negotiable rules:
@@ -93,21 +95,172 @@ Does the Task body contain try or await that can throw?
 └── NO  -> Task {} is fine as-is
 ```
 
+## Logging Configuration State
+
+On first use of any scanning workflow, check for `.claude/ios-logging-config.md` in the project root. If it doesn't exist, run the **Configuration Phase** below before scanning. If it exists, read it and use those preferences for all fixes.
+
+### Configuration Phase (runs once per project)
+
+Ask the user these questions and persist answers to `.claude/ios-logging-config.md`:
+
+1. **Crash SDK** — "Which crash reporting SDK does this project use?"
+   - Sentry / Firebase Crashlytics / Datadog / Bugsnag / None (os.Logger only)
+   - If none yet: recommend Sentry (best observability) or Crashlytics (if Firebase-heavy)
+
+2. **ErrorReporter protocol** — "Do you have a centralized ErrorReporter protocol?"
+   - Yes → ask for the type name and import path
+   - No → offer to create one wrapping their chosen SDK
+
+3. **Logger setup** — "Do you have an os.Logger extension with categories?"
+   - Yes → ask for the extension location
+   - No → offer to create one with standard categories (networking, persistence, auth, ui)
+
+4. **PII sensitivity** — "What data sensitivity level?"
+   - Standard (default privacy annotations)
+   - Health/HIPAA (aggressive `.private`, no PHI in logs)
+   - Finance/PCI (redact all financial data)
+
+5. **Preferred fix style** — "How should I apply fixes?"
+   - Minimal: add logging to existing catch blocks, don't restructure code
+   - Full: replace `try?` with `do/catch`, add error states, restructure where needed
+
+### Config file format: `.claude/ios-logging-config.md`
+
+```markdown
+---
+crash_sdk: sentry
+error_reporter_type: ErrorReporter
+error_reporter_import: "import ErrorReporting"
+logger_extension: "Sources/Core/Logger+Extensions.swift"
+logger_subsystem: "Bundle.main.bundleIdentifier!"
+pii_level: standard
+fix_style: full
+---
+```
+
+The config is a simple YAML frontmatter file. The skill reads it at the start of every scanning workflow and uses the values to generate correct import statements, SDK calls, and Logger patterns without asking the user again.
+
 ## Workflows
+
+### Workflow: Scan Project for Silent Failures
+
+**When:** User asks to "scan for silent failures", "audit error handling", "find missing logging", "check for try?", or any variant of "make sure nothing fails silently."
+
+This is the primary scanning workflow — modeled after ios-security-audit's Phase 0 → Scan → Report pattern.
+
+#### Phase 0: Discover & Configure
+
+1. **Check for `.claude/ios-logging-config.md`** — if missing, run Configuration Phase above
+2. **Discover project structure:**
+   - Scan for `.xcodeproj`/`.xcworkspace` to list all targets
+   - Count `.swift` files per target
+   - Detect if app has extensions (widget, notification service, watch, etc.)
+3. **Present scope menu to user:**
+
+```
+Silent Failure Scan — choose scope:
+
+Target scope:
+  A: Main target only (~5 min)
+  B: All targets including extensions (~10 min)
+  C: Specific target (you specify)
+
+Scan depth:
+  1: Critical patterns only (try?, Task {}, print(), empty catch)
+  2: Full scan (adds Combine, URLSession status, NotificationCenter, Core Data, BGTask)
+  3: Full + infrastructure (adds dSYM check, extension SDK init, MetricKit, privacy manifests)
+
+Example: "B2" = all targets, full scan
+```
+
+4. **User confirms** (e.g., "A1" or "B3") before scanning begins
+
+#### Phase 1: Scan
+
+Run grep-based detection first (zero-token, fast), then semantic review on flagged files.
+
+**Depth 1 — Critical patterns:**
+
+| Pattern | Detection | Fix |
+|---------|-----------|-----|
+| `try?` on non-trivial operations | `grep -rn 'try?' --include='*.swift'` | Replace with `do/catch` + Logger + ErrorReporter |
+| `Task {}` / `Task.detached {}` with throwing code | `grep -rn 'Task\s*{' --include='*.swift'` — then check if body has `try`/`await` without `do/catch` | Wrap in `do/catch`, distinguish CancellationError |
+| `print(` in production code | `grep -rn 'print(' --include='*.swift'` — exclude test targets | Replace with `Logger.<category>.<level>()` with privacy annotations |
+| Empty catch blocks | `grep -rn 'catch\s*{' --include='*.swift'` — then check if body is empty or only has `break`/`return` | Add Logger.error + ErrorReporter.recordNonFatal |
+| Catch blocks with only `print` | Semantic: catch blocks where the only action is `print(error)` | Add Logger + ErrorReporter, remove print |
+| `else` with silent return | Semantic: guard/if-else where the else branch returns/breaks without logging | Add Logger.warning explaining what condition was unexpected |
+
+**Depth 2 — Full scan (adds to depth 1):**
+
+| Pattern | Detection | Fix |
+|---------|-----------|-----|
+| `.replaceError()` killing Combine pipelines | `grep -rn '.replaceError' --include='*.swift'` | Move error handling inside flatMap |
+| `receiveCompletion` with only print | Semantic: sink completion handlers with just print | Add Logger + ErrorReporter |
+| URLSession without status code check | Semantic: `URLSession.shared.data(` without `httpResponse.statusCode` | Add HTTP status validation + error reporting |
+| NotificationCenter observer not stored | Semantic: `addObserver(forName:` return value discarded | Store token, add typed Notification.Name |
+| Core Data `try? context.save()` | `grep -rn 'try?.*save()' --include='*.swift'` | Replace with do/catch, NSError userInfo extraction, rollback |
+| `.task {}` with `try?` | `grep -rn 'try?' --include='*.swift'` in `.task` context | Replace with do/catch, CancellationError filter |
+| BGTask without do/catch | Semantic: `BGProcessingTask`/`BGAppRefreshTask` handlers | Add do/catch + expirationHandler |
+
+**Depth 3 — Infrastructure (adds to depth 2):**
+
+| Check | Detection | Fix |
+|-------|-----------|-----|
+| dSYM configuration | Check `Build Settings` for `DEBUG_INFORMATION_FORMAT` | Set to `DWARF with dSYM File` for all targets |
+| Extension SDK initialization | Check extension entry points for crash SDK `start()` | Add separate SDK init + disable autoSessionTracking |
+| MetricKit subscriber | `grep -rn 'MXMetricManager' --include='*.swift'` | Add MXMetricManagerSubscriber if missing |
+| PrivacyInfo.xcprivacy | Check for file existence | Create if missing (required since May 2024) |
+| Dual crash reporter conflicts | Check for both Sentry + Crashlytics initialization | Warn about signal handler conflicts |
+
+#### Phase 2: Report
+
+Output findings grouped by severity:
+
+```
+## Silent Failure Scan Report
+
+### Configuration
+- SDK: [from config]
+- Scope: [user choice]
+- Files scanned: N
+
+### CRITICAL (errors vanishing completely)
+[try? on network/auth/payment, Task {} swallowing, empty catch blocks]
+
+### HIGH (errors logged locally but not reported remotely)
+[catch blocks with only print() or Logger but no ErrorReporter]
+
+### MEDIUM (weak observability)
+[missing privacy annotations, missing CancellationError filter, URLSession status unchecked]
+
+### Summary
+| Severity | Count |
+|----------|-------|
+| Critical | N |
+| High | N |
+| Medium | N |
+| **Total** | **N** |
+
+### Auto-fix available
+[List of files where the skill can apply fixes automatically using the config preferences]
+```
+
+After the report, offer: "Should I fix these? I'll use [SDK from config] and [fix style from config]."
 
 ### Workflow: Add Logging to Existing Codebase
 
-**When:** Setting up observability for an iOS project, or migrating from print() to Logger.
+**When:** Setting up observability for an iOS project from scratch, or migrating from print() to Logger.
 
-1. Create Logger extensions with subsystem/category (`references/logger-setup.md`)
-2. Create ErrorReporter protocol and SDK implementation (`references/crash-sdk-integration.md`)
-3. Audit all `print()` calls — replace with appropriate Logger level
-4. Audit all `try?` usages — convert critical ones to `do/catch` (`references/silent-failures.md`)
-5. Audit all `Task {}` blocks — ensure do/catch wraps any throwing code
-6. Audit Combine pipelines — move error handling inside `flatMap` (`references/silent-failures.md`)
-7. Add MetricKit subscriber for OOM/watchdog detection (`references/metrickit.md`)
-8. Verify dSYMs: Debug Information Format = "DWARF with dSYM File" for all targets
-9. If app has extensions: initialize crash SDK separately in each (`references/enterprise-patterns.md`)
+1. **Run Configuration Phase** if `.claude/ios-logging-config.md` doesn't exist
+2. Create Logger extensions with subsystem/category (`references/logger-setup.md`)
+3. Create ErrorReporter protocol and SDK implementation (`references/crash-sdk-integration.md`)
+4. Audit all `print()` calls — replace with appropriate Logger level
+5. Audit all `try?` usages — convert critical ones to `do/catch` (`references/silent-failures.md`)
+6. Audit all `Task {}` blocks — ensure do/catch wraps any throwing code
+7. Audit Combine pipelines — move error handling inside `flatMap` (`references/silent-failures.md`)
+8. Add MetricKit subscriber for OOM/watchdog detection (`references/metrickit.md`)
+9. Verify dSYMs: Debug Information Format = "DWARF with dSYM File" for all targets
+10. If app has extensions: initialize crash SDK separately in each (`references/enterprise-patterns.md`)
 
 ### Workflow: Review Error Handling in PR
 

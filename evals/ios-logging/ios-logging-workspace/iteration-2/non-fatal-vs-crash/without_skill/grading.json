@@ -1,0 +1,24 @@
+{
+  "eval_id": 27,
+  "eval_name": "non-fatal-vs-crash",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "States non-fatal errors affect 10-30%+ of sessions vs crashes at ~1-2%",
+      "passed": true,
+      "evidence": "Matched: ['10', '%']"
+    },
+    {
+      "text": "Emphasizes non-fatal reporting as primary tool for detecting silent failures",
+      "passed": true,
+      "evidence": "Matched: ['non-fatal', 'silent']"
+    },
+    {
+      "text": "Mentions Crashlytics 8 non-fatal per session limit as a concern for high-volume apps",
+      "passed": false,
+      "evidence": "Matched: ['crashlytics'], Missing group containing: ['8 non-fatal']"
+    }
+  ],
+  "pass_count": 2,
+  "total": 3
+}

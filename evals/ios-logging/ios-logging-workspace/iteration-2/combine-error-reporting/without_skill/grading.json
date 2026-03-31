@@ -1,0 +1,24 @@
+{
+  "eval_id": 24,
+  "eval_name": "combine-error-reporting",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Explains that once receiveCompletion fires with .failure, the pipeline is permanently dead",
+      "passed": true,
+      "evidence": "Matched: ['.failure', 'dead']"
+    },
+    {
+      "text": "Moves error handling inside flatMap with .catch or .tryCatch to keep outer pipeline alive",
+      "passed": true,
+      "evidence": "Matched: ['inside flatmap', 'alive']"
+    },
+    {
+      "text": "Replaces print() with Logger and ErrorReporter in the error path",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['logger', 'errorreporter']"
+    }
+  ],
+  "pass_count": 2,
+  "total": 3
+}

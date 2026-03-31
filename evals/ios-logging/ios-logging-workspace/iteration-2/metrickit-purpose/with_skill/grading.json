@@ -1,0 +1,29 @@
+{
+  "eval_id": 12,
+  "eval_name": "metrickit-purpose",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Explains MetricKit runs out-of-process (not inside the app)",
+      "passed": true,
+      "evidence": "Matched: ['out-of-process']"
+    },
+    {
+      "text": "Identifies OOM and watchdog kills as things MetricKit catches that in-process reporters miss",
+      "passed": true,
+      "evidence": "Matched: ['oom', 'catch']"
+    },
+    {
+      "text": "Mentions the opt-in limitation ('Share with App Developers' in Settings)",
+      "passed": true,
+      "evidence": "Matched: ['share with app developer']"
+    },
+    {
+      "text": "Recommends using both MetricKit and a third-party crash SDK",
+      "passed": true,
+      "evidence": "Matched: ['use both']"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

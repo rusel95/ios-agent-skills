@@ -8,8 +8,8 @@
   <a href="https://github.com/rusel95/ios-agent-skills"><img src="https://img.shields.io/github/forks/rusel95/ios-agent-skills?style=flat-square&color=blue" alt="forks"/></a>
   <img src="https://img.shields.io/badge/skills-10-purple?style=flat-square" alt="skills"/>
   <img src="https://img.shields.io/badge/models_tested-3-teal?style=flat-square" alt="models"/>
-  <img src="https://img.shields.io/badge/assertions-767-orange?style=flat-square" alt="assertions"/>
-  <img src="https://img.shields.io/badge/scenarios-233-green?style=flat-square" alt="scenarios"/>
+  <img src="https://img.shields.io/badge/assertions-800-orange?style=flat-square" alt="assertions"/>
+  <img src="https://img.shields.io/badge/scenarios-245-green?style=flat-square" alt="scenarios"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square" alt="license"/></a>
 </p>
 
@@ -26,13 +26,14 @@
   <img src="https://img.shields.io/badge/TCA-+26%25_Sonnet-AF52DE?style=for-the-badge&logo=swift&logoColor=white" alt="tca"/>
   <img src="https://img.shields.io/badge/VIPER-+13%25_Sonnet-FF9500?style=for-the-badge&logo=swift&logoColor=white" alt="viper"/>
   <img src="https://img.shields.io/badge/Accessibility-+18%25_Sonnet-00C7BE?style=for-the-badge&logo=swift&logoColor=white" alt="accessibility"/>
+  <img src="https://img.shields.io/badge/Logging-+34%25_Sonnet-8E8E93?style=for-the-badge&logo=swift&logoColor=white" alt="logging"/>
 </p>
 
 # iOS Agent Skills
 
 **The first and most comprehensively benchmarked iOS skill marketplace** for Claude Code, Codex, and 40+ AI coding tools.
 
-10 enterprise-grade skills covering architecture, concurrency, testing, security, accessibility, and localization — every skill benchmarked with discriminating assertions and blind A/B quality scoring across multiple LLMs. No other iOS skill collection has this level of rigorous, reproducible evaluation — 767 assertions across 233 scenarios, tested on Claude Sonnet 4.6, GPT-5.4, and Gemini 3.1 Pro.
+10 enterprise-grade skills covering architecture, concurrency, testing, security, accessibility, and localization — every skill benchmarked with discriminating assertions and blind A/B quality scoring across multiple LLMs. No other iOS skill collection has this level of rigorous, reproducible evaluation — 800 assertions across 245 scenarios, tested on Claude Sonnet 4.6, GPT-5.4, and Gemini 3.1 Pro.
 
 ## Benchmark Results
 
@@ -48,18 +49,36 @@ Every skill is benchmarked against multiple LLMs with discriminating assertions 
 | **gcd-operations** | +47.4% | +4.8% | +16.1% | 13 | 19 |
 | **ios-testing** | +44.2% | +30.0% | +33.6% | 27 | 77 |
 | **ios-security** | +29.7% | +26.4% | — | 17 | 37 |
-| **ios-logging** | +41.4%* | — | — | 15 | 58 |
+| **ios-logging** | +34.1% | — | — | 27 | 91 |
 | **ios-accessibility** | +18.3% | — | — | 36 | 115 |
 | **ios-localization** | +1.9% | — | — | 36 | 103 |
 
 > Delta = percentage point improvement in discriminating assertion pass rate (with skill vs without skill). Higher = more value added. "—" = not yet benchmarked for that model.
+
+### Blind A/B Quality Scoring (Sonnet 4.6)
+
+| Skill | W/T/L | Avg Score (with↑without) |
+|-------|:-----:|:------------------------:|
+| **swiftui-mvvm** | **9W** 15T 0L | 9.2↑8.8 |
+| **uikit-mvvm** | **20W** 2T 2L | 9.1↑8.2 |
+| **viper-uikit** | **15W** 1T 0L | 9.4↑8.2 |
+| **tca-swiftui** | **14W** 2T 4L | 8.7↑7.8 |
+| **swift-concurrency** | **15W** 9T 0L | 8.9↑8.5 |
+| **gcd-operations** | **15W** 9T 0L | 8.6↑8.1 |
+| **ios-testing** | **23W** 7T 0L | 8.9↑8.0 |
+| **ios-security** | **9W** 15T 0L | 9.3↑8.9 |
+| **ios-logging** | **25W** 0T 2L | 8.6↑7.4 |
+| **ios-accessibility** | **21W** 15T 0L | 8.8↑7.9 |
+| **ios-localization** | **27W** 0T 9L | 8.4↑7.6 |
+
+> **W/T/L** — Blind A/B comparison: wins, ties, losses. A judge scores both responses 0-10 without knowing which used the skill; position is randomized. **Wins = skill response better. Ties = equally good. Losses = baseline better.**
 
 ### Methodology
 
 - **Discriminating assertions**: binary checks that distinguish skill-guided output from baseline. Each assertion targets a specific pattern AI tools consistently miss without the skill.
 - **A/B quality scoring**: blind judge scores both outputs 0–10 without knowing which used the skill. Position randomized to prevent bias.
 - **Multi-model**: tested across Claude Sonnet 4.6, GPT-5.4, and Gemini 3.1 Pro to ensure skill value isn't model-specific.
-- **Topic-based scenarios**: each skill covers all its domain topics with focused evaluation prompts. Earlier skills used tiered difficulty (simple/medium/complex); newer skills use flat topic-based evals.
+- **Topic-based scenarios**: each skill covers all its domain topics with focused evaluation prompts.
 
 ## Skills
 
@@ -108,7 +127,7 @@ Clone and copy the `skills/` directory into your project.
 - **Iterative refactoring** — small, reviewable PRs (≤200 lines) instead of "rewrite everything" approaches
 - **Anti-pattern prevention** — AI tools consistently generate broken patterns (retain cycles in VIPER, outdated TCA APIs, unsafe GCD). These skills prevent that
 - **Architecture coverage** — the only collection covering VIPER, TCA, GCD, Security Audit, Accessibility, and Localization. No other iOS skill marketplace covers these domains
-- **Rigorously benchmarked** — the most comprehensively evaluated iOS skill collection available: 767 discriminating assertions across 233 scenarios, tested against 3 LLMs with blind A/B quality scoring. Every skill ships with reproducible eval data
+- **Rigorously benchmarked** — the most comprehensively evaluated iOS skill collection available: 800 discriminating assertions across 245 scenarios, tested against 3 LLMs with blind A/B quality scoring. Every skill ships with reproducible eval data
 
 ## Skill Details
 
@@ -137,7 +156,7 @@ Swift Testing (@Test/@Suite/#expect), XCTest, async testing, architecture-specif
 OWASP MASVS v2.1.0 audit (24 controls, 8 categories). Keychain, ATS, certificate pinning, WebView, biometric auth, compliance mapping (HIPAA, PCI DSS, GDPR). **+29.7% on Sonnet, +26.4% on GPT-5.4.**
 
 ### ios-logging
-Production error observability: `os.Logger` with privacy annotations, crash SDK integration (Sentry/Crashlytics/PostHog), MetricKit for OOM/watchdog detection, silent failure pattern elimination (`try?`, `Task {}`, Combine `.replaceError()`), PII compliance, centralized error handling, retry with backoff, app extension monitoring. Recommends remote logging SDKs and MCP/CLI connections for AI-assisted debugging. **+41.4% on Opus 4.6** (58 assertions, 15 scenarios).
+Production error observability: `os.Logger` with privacy annotations, crash SDK integration (Sentry/Crashlytics), MetricKit for OOM/watchdog detection, silent failure pattern elimination (`try?`, `Task {}`, Combine `.replaceError()`), PII compliance, centralized error handling, retry with backoff, app extension monitoring, MCP connectivity for AI-assisted debugging. **25W 0T 2L** blind A/B (8.6↑7.4), **+34.1% on Sonnet 4.6** (91 assertions, 27 scenarios).
 
 ### ios-accessibility
 VoiceOver, Dynamic Type, color contrast, motion preferences, Switch Control, Voice Control, WCAG 2.2 AA mapping. Corrects 11 documented AI failure patterns (onTapGesture, hardcoded fonts, missing labels, trait assignment). **+18.3% on Sonnet 4.6** (115 assertions, 100% with-skill, 21 discriminating wins).

@@ -1,0 +1,83 @@
+[
+  {
+    "eval": "breadcrumbs-usage",
+    "a_score": 7.2,
+    "b_score": 8.4,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both cover breadcrumbs well. A is broader with more categories (6 scenarios) but uses generic helper functions rather than real SDK calls. B is more focused and specific: uses ErrorReporter protocol abstraction with concrete code, explains why breadcrumbs go before risky ops (not after), differentiates breadcrumbs from Logger and recordNonFatal, and covers retry attempts and background task lifecycle which are more production-relevant. B's guidelines section is more actionable with the before-not-after rule."
+  },
+  {
+    "eval": "dsym-setup",
+    "a_score": 8.5,
+    "b_score": 7.6,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "A provides a clearer step-by-step fix: explicitly says set dwarf-with-dsym for ALL targets including extensions, provides the build phase script with both SPM and CocoaPods paths, explains Bitcode is deprecated (correct and concise), warns about running multiple crash reporters simultaneously, and includes a test crash verification step. B covers more options (Fastlane, SPM plugin, CI/CD) but is less focused on solving the specific problem. B also mentions setting dwarf-with-dsym only for Release which misses Debug builds for development symbolication. A's note about signal handler conflicts is a critical production detail B lacks."
+  },
+  {
+    "eval": "swiftui-task-modifier",
+    "a_score": 7.5,
+    "b_score": 8.6,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both identify the core issues (try? swallows errors, no error state, no CancellationError handling). A covers more issues (6 vs 3) including singleton testability and initial vs refresh loading, but B is more precise on the critical problems. B adds Logger.networking.error with privacy annotations and ErrorReporter.shared.recordNonFatal in the fix -- production-essential patterns A entirely omits. B's comparison table is cleaner and the concluding rule about never using try? inside .task is a strong actionable takeaway. B's fix is more production-ready."
+  },
+  {
+    "eval": "operational-pii-leaks",
+    "a_score": 8.7,
+    "b_score": 7.0,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly identify the PII risks in logging headers and body. A is significantly more specific: explains why .info level is wrong (memory-only, not persisted), provides the exact fix with privacy annotations on each field, explains logging only URL path not query params, includes the GDPR/CCPA compliance table, and provides the #if DEBUG guard with privacy: .private annotation. B's header sanitization code has a bug (mapValues closure signature is wrong -- it takes only value, not key/value). B's approach of an allowlist is sound but less immediately actionable. A demonstrates deeper os.Logger expertise."
+  },
+  {
+    "eval": "error-reporter-protocol",
+    "a_score": 6.8,
+    "b_score": 8.4,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both explain the protocol abstraction pattern well. A covers the basics (coupling, DIP, testability, vendor lock-in) but the protocol is minimal (just report + context). B goes further: protocol includes recordNonFatal, addBreadcrumb, setUserID, setCustomKey, log -- a more realistic production API. B explains composite reporting with concrete code, mentions the missing local Logger step (a key insight A lacks), addresses inconsistent error context, and shows the dual log-locally + report-remotely pattern. B's protocol and SentryErrorReporter implementation are more complete and production-ready."
+  },
+  {
+    "eval": "combine-error-reporting",
+    "a_score": 8.6,
+    "b_score": 7.0,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly identify that errors must be caught inside flatMap. A is superior in several ways: explains why print() is invisible in production, uses os.Logger with privacy annotations, includes ErrorReporter.shared.recordNonFatal for remote reporting, warns about the replaceError anti-pattern with clear explanation, and includes the Result-wrapping pattern for UI error surfacing. B covers more operator variants (tryCatch, replaceError inside flatMap) but still uses print() in catch blocks and lacks any structured logging or remote error reporting -- the exact production gap the question implies. A's summary table is more informative."
+  },
+  {
+    "eval": "mcp-connectivity",
+    "a_score": 6.5,
+    "b_score": 8.3,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "A covers three approaches (API, MCP, custom scripts) but stays generic -- the MCP config uses a hypothetical package name with a disclaimer, the Python script is not iOS-specific, and the debugging tips are superficial. B is laser-focused on the MCP setup for Claude Code specifically (claude mcp add sentry), provides the exact .mcp.json config, gives concrete natural-language query examples, and crucially connects MCP to the broader logging ecosystem (breadcrumbs, dSYMs, ErrorReporter). B also explains what makes queries useful (proper error reporting in the app). B is more actionable and cohesive."
+  },
+  {
+    "eval": "notification-silent-failures",
+    "a_score": 8.2,
+    "b_score": 7.4,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly identify the discarded token and strong capture issues. A adds two critical elements B lacks: string-based notification name mismatch as a silent failure cause (with the typed extension fix), and production-grade os.Logger observability at registration and receipt points. B covers more edge cases (multiple setupNotifications calls, thread safety, object parameter filtering, debugging tips) which is useful but less focused on the core logging/observability angle. A's summary table is concise and actionable. The Logger addition in A is a differentiator for production debugging."
+  },
+  {
+    "eval": "non-fatal-vs-crash",
+    "a_score": 7.0,
+    "b_score": 8.8,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "A gives a solid overview with practical recommendations (week-by-week rollout, alerting thresholds) but stays at a high level without code. B provides concrete numbers (1-2% crash vs 10-30% non-fatal), specific silent failure patterns (try?, Task without do/catch, Combine replaceError), the ErrorReporter protocol with code, the dual Logger + ErrorReporter catch block rule, MetricKit for OOM/watchdog (a layer A misses entirely), the signal handler conflict warning, and an SDK selection table. B is substantially more comprehensive, specific, and actionable for an iOS developer."
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "eval_id": 2,
+  "eval_name": "combine-pipeline-death",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Explains that .replaceError() kills the entire pipeline permanently (changes Failure type to Never)",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['kills the']"
+    },
+    {
+      "text": "Recommends moving error handling inside flatMap to keep the outer pipeline alive",
+      "passed": true,
+      "evidence": "Matched: ['inside flatmap']"
+    },
+    {
+      "text": "Includes ErrorReporter or crash SDK call inside the error recovery",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['errorreporter']"
+    }
+  ],
+  "pass_count": 1,
+  "total": 3
+}

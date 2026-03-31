@@ -1,0 +1,24 @@
+{
+  "eval_id": 6,
+  "eval_name": "crash-sdk-selection",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Mentions Crashlytics limitation of 8 non-fatal exceptions per session",
+      "passed": true,
+      "evidence": "Matched: ['8 non-fatal', 'crashlytics']"
+    },
+    {
+      "text": "Warns against running both for fatal crash reporting (signal handler conflicts)",
+      "passed": true,
+      "evidence": "Matched: ['signal handler']"
+    },
+    {
+      "text": "Recommends wrapping behind a protocol/abstraction layer (ErrorReporter)",
+      "passed": true,
+      "evidence": "Matched: ['protocol']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

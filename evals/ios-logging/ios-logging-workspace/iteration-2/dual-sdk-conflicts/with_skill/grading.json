@@ -1,0 +1,24 @@
+{
+  "eval_id": 8,
+  "eval_name": "dual-sdk-conflicts",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies signal handler conflict (SIGABRT, SIGSEGV, SIGBUS \u2014 only last registered receives the signal)",
+      "passed": true,
+      "evidence": "Matched: ['signal handler', 'conflict']"
+    },
+    {
+      "text": "Recommends disabling crash handler on one SDK (e.g., options.enableCrashHandler = false)",
+      "passed": true,
+      "evidence": "Matched: ['enablecrashhandler', 'false']"
+    },
+    {
+      "text": "Recommends MetricKit for crashes that in-process reporters miss (OOM, watchdog)",
+      "passed": true,
+      "evidence": "Matched: ['metrickit', 'oom']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

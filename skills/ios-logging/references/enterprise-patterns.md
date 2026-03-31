@@ -2,7 +2,7 @@
 
 ## Centralized Error Handling Service
 
-Every error should flow through a single service that decides the response based on error category.
+SwiftUI lacks React-style Error Boundaries — there is no built-in mechanism that catches and contains errors at a component boundary. When an error occurs inside a SwiftUI view hierarchy, it either crashes or is swallowed silently. This makes centralized error handling essential: every error should flow through a single service that decides the response based on error category.
 
 ### CategorizedError Protocol
 

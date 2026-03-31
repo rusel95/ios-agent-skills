@@ -1,0 +1,24 @@
+{
+  "eval_id": 26,
+  "eval_name": "notification-silent-failures",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Identifies that the observer token is not stored \u2014 observation may be immediately deallocated",
+      "passed": true,
+      "evidence": "Matched: ['token', 'store']"
+    },
+    {
+      "text": "Identifies string-based notification name as fragile (typos cause silent failure)",
+      "passed": true,
+      "evidence": "Matched: ['string']"
+    },
+    {
+      "text": "Recommends typed Notification.Name constants",
+      "passed": true,
+      "evidence": "Matched: ['notification.name']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

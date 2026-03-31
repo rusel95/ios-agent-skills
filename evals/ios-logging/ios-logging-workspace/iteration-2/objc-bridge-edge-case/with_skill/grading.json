@@ -1,0 +1,24 @@
+{
+  "eval_id": 18,
+  "eval_name": "objc-bridge-edge-case",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "States that Objective-C NSExceptions are NOT caught by Swift do/catch",
+      "passed": true,
+      "evidence": "Matched: ['nsexception', 'not caught']"
+    },
+    {
+      "text": "Lists specific NSException triggers (NSArray out-of-bounds, invalid KVO, unrecognized selector)",
+      "passed": true,
+      "evidence": "Matched: 5 of 5 triggers"
+    },
+    {
+      "text": "Explains the Swift-ObjC bridge edge case: if ObjC returns non-nil AND sets NSError, Swift catch block never fires",
+      "passed": true,
+      "evidence": "Matched: ['bridge', 'non-nil']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

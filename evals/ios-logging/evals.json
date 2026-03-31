@@ -1,94 +1,115 @@
 {
   "skill_name": "ios-logging",
-  "eval_structure": "reference-file x scenario (simple/medium/complex)",
+  "methodology": "discriminating-only, 15 topics, 27 evals, topic-based",
+  "topics": [
+    "task-error-swallowing",
+    "try-question-mark",
+    "combine-pipeline-death",
+    "cancellation-error",
+    "urlsession-status-codes",
+    "core-data-silent-failures",
+    "print-replacement",
+    "logger-setup",
+    "privacy-annotations",
+    "crash-sdk-selection",
+    "error-reporter-protocol",
+    "dual-sdk-conflicts",
+    "metrickit",
+    "pii-compliance",
+    "centralized-error-handling",
+    "retry-with-backoff",
+    "app-extensions",
+    "background-tasks",
+    "objc-bridge-edge-case",
+    "mcp-connectivity",
+    "audit-viewmodel",
+    "combine-error-reporting",
+    "breadcrumbs",
+    "dsym-configuration",
+    "notification-silent-failures",
+    "swiftui-task-modifier",
+    "operational-pii-leaks"
+  ],
   "evals": [
     {
       "id": 1,
-      "reference": "silent-failures",
-      "name": "silent-failures-simple",
+      "name": "task-error-swallowing",
+      "topic": "task-error-swallowing",
       "prompt": "What's wrong with this error handling?\n\n```swift\nfunc loadUserProfile() {\n    Task {\n        let profile = try? await api.fetchProfile(userId: currentUser.id)\n        self.profile = profile\n    }\n}\n```",
-      "expected_output": "Two silent failure patterns: (1) Task {} with try? — if fetchProfile throws, the error is silently discarded and profile stays nil forever with no log, no crash report. (2) try? erases all diagnostic information — was it a 401, a timeout, or a decoding error? All context lost. Fix: use do/catch inside the Task with Logger.error() and ErrorReporter.recordNonFatal(), and distinguish CancellationError from real errors.",
       "assertions": [
         {
-          "id": "SF1.1",
+          "id": "TE1.1",
           "text": "Identifies Task {} as a silent error swallowing pattern because Task.init is @discardableResult",
-          "rationale": "Skill-specific knowledge about Task {} error handling — baseline may just suggest adding do/catch without explaining why"
+          "rationale": "Skill-specific knowledge — baseline may suggest do/catch without explaining why Task swallows"
         },
         {
-          "id": "SF1.2",
-          "text": "Identifies try? as destroying diagnostic information (error type, message, stack context)",
-          "rationale": "Skill emphasizes try? is the most dangerous convenience for observability — baseline often accepts try? as fine"
+          "id": "TE1.2",
+          "text": "Identifies try? as destroying diagnostic information (error type, message, context)",
+          "rationale": "Skill emphasizes try? is the most dangerous convenience for observability"
         },
         {
-          "id": "SF1.3",
+          "id": "TE1.3",
           "text": "Recommends Logger.error() with privacy annotations instead of print()",
           "rationale": "Skill mandates os.Logger over print — baseline typically suggests print(error)"
         },
         {
-          "id": "SF1.4",
+          "id": "TE1.4",
           "text": "Recommends reporting to a crash SDK (ErrorReporter.recordNonFatal or Sentry/Crashlytics)",
-          "rationale": "Skill requires remote error reporting in every catch block — baseline rarely mentions crash SDKs"
+          "rationale": "Skill requires remote error reporting in every catch block"
         }
       ]
     },
     {
       "id": 2,
-      "reference": "silent-failures",
-      "name": "silent-failures-medium",
+      "name": "combine-pipeline-death",
+      "topic": "combine-pipeline-death",
       "prompt": "This Combine search pipeline works once but then stops responding. What's wrong?\n\n```swift\n$searchQuery\n    .debounce(for: .seconds(0.3), scheduler: DispatchQueue.main)\n    .flatMap { query in\n        APIService.search(query)\n    }\n    .replaceError(with: [])\n    .assign(to: &$results)\n```",
-      "expected_output": "When APIService.search emits a failure, .replaceError(with: []) changes the publisher's Failure type to Never, which terminates the entire pipeline permanently. Error recovery must happen inside flatMap to keep the outer pipeline alive. Fix: move .catch inside flatMap, add .retry(2) before the catch, and report the error to ErrorReporter.",
       "assertions": [
         {
-          "id": "SF2.1",
+          "id": "CP2.1",
           "text": "Explains that .replaceError() kills the entire pipeline permanently (changes Failure type to Never)",
-          "rationale": "Skill explicitly covers this critical Combine behavior — baseline may suggest a different fix"
+          "rationale": "Skill explicitly covers this critical Combine behavior"
         },
         {
-          "id": "SF2.2",
+          "id": "CP2.2",
           "text": "Recommends moving error handling inside flatMap to keep the outer pipeline alive",
-          "rationale": "The correct fix from the skill — error recovery must be scoped to the inner publisher"
+          "rationale": "The correct fix — error recovery must be scoped to the inner publisher"
         },
         {
-          "id": "SF2.3",
+          "id": "CP2.3",
           "text": "Includes ErrorReporter or crash SDK call inside the error recovery",
-          "rationale": "Skill requires every error path to report remotely — baseline just fixes the pipeline without observability"
+          "rationale": "Skill requires every error path to report remotely"
         }
       ]
     },
     {
       "id": 3,
-      "reference": "silent-failures",
-      "name": "silent-failures-complex",
+      "name": "audit-viewmodel",
+      "topic": "audit-viewmodel",
       "prompt": "Audit this ViewModel for silent failure patterns and fix them:\n\n```swift\nclass OrderViewModel: ObservableObject {\n    @Published var orders: [Order] = []\n    @Published var isLoading = false\n    \n    func loadOrders() {\n        isLoading = true\n        Task {\n            let result = try? await OrderService.shared.fetchOrders()\n            await MainActor.run {\n                self.orders = result ?? []\n                self.isLoading = false\n            }\n        }\n    }\n    \n    func placeOrder(_ order: Order) {\n        Task {\n            try? await OrderService.shared.submitOrder(order)\n            try? await OrderService.shared.sendConfirmationEmail(order)\n            print(\"Order placed successfully\")\n        }\n    }\n    \n    func deleteOrder(_ id: String) {\n        Task.detached {\n            try await OrderService.shared.deleteOrder(id)\n        }\n    }\n}\n```",
-      "expected_output": "Multiple silent failure patterns: (1) loadOrders: try? hides fetch errors — user sees empty orders with no error message. (2) placeOrder: two try? calls — if submitOrder fails, sendConfirmationEmail still runs on stale data; if either fails, print() goes nowhere in production. (3) deleteOrder: Task.detached with try but no do/catch — if delete throws, error is silently discarded. (4) All three methods use print() or no logging at all. Fix all with do/catch, Logger.error() with privacy annotations, ErrorReporter.recordNonFatal(), proper error state for UI, and CancellationError handling.",
       "assertions": [
         {
-          "id": "SF3.1",
+          "id": "AV3.1",
           "text": "Identifies all three methods have silent failure patterns (try? in loadOrders, try? in placeOrder, unhandled throw in deleteOrder)",
           "rationale": "Comprehensive audit requires finding all three — skill trains systematic scanning"
         },
         {
-          "id": "SF3.2",
+          "id": "AV3.2",
           "text": "Identifies that placeOrder's two try? calls create a logic error (confirmation email sent even if order submission fails)",
-          "rationale": "Skill teaches that try? hides control flow bugs, not just diagnostic loss"
+          "rationale": "try? hides control flow bugs, not just diagnostic loss"
         },
         {
-          "id": "SF3.3",
-          "text": "Identifies print('Order placed successfully') is invisible in production (not part of unified logging system)",
-          "rationale": "Skill rule: print() is not error handling, not visible on production devices"
+          "id": "AV3.3",
+          "text": "Identifies print('Order placed successfully') is invisible in production",
+          "rationale": "Skill rule: print() is not visible on production devices"
         },
         {
-          "id": "SF3.4",
-          "text": "Identifies Task.detached strips priority and cancellation propagation (rarely correct choice)",
-          "rationale": "Skill cross-references with swift-concurrency knowledge about detached tasks"
-        },
-        {
-          "id": "SF3.5",
-          "text": "Provides fix with os.Logger using privacy annotations (not just print or generic logging)",
+          "id": "AV3.4",
+          "text": "Provides fix with os.Logger using privacy annotations",
           "rationale": "Skill mandates privacy-annotated Logger — the key differentiator from baseline"
         },
         {
-          "id": "SF3.6",
+          "id": "AV3.5",
           "text": "Adds ErrorReporter.recordNonFatal() or crash SDK call in every catch block",
           "rationale": "Remote reporting in every error path — the core skill requirement"
         }
@@ -96,334 +117,588 @@
     },
     {
       "id": 4,
-      "reference": "logger-setup",
-      "name": "logger-setup-simple",
+      "name": "print-replacement",
+      "topic": "print-replacement",
       "prompt": "I'm setting up logging for my iOS app. Currently using print() everywhere. What should I use instead and why?",
-      "expected_output": "Use os.Logger (import os). Create Logger extensions with subsystem (bundle identifier) and categories (Networking, Auth, Database, etc.). Logger uses binary representation with zero cost for debug messages in production, has privacy annotations for GDPR compliance, persists error/fault levels to disk, and is filterable in Xcode and Console.app. print() writes to stdout with no levels, no persistence, no privacy, and is invisible on production devices.",
       "assertions": [
         {
-          "id": "LS1.1",
-          "text": "Recommends os.Logger (not OSLog, not custom logging framework, not third-party like CocoaLumberjack)",
-          "rationale": "Skill prescribes os.Logger as the standard — baseline may suggest alternatives"
+          "id": "PR4.1",
+          "text": "Recommends os.Logger (not OSLog, not custom logging framework, not CocoaLumberjack)",
+          "rationale": "Skill prescribes os.Logger as the standard"
         },
         {
-          "id": "LS1.2",
+          "id": "PR4.2",
           "text": "Shows Logger extension pattern with subsystem = Bundle.main.bundleIdentifier and named categories",
-          "rationale": "Skill provides the exact setup pattern — baseline may show inline Logger creation"
+          "rationale": "Skill provides the exact setup pattern"
         },
         {
-          "id": "LS1.3",
+          "id": "PR4.3",
           "text": "Mentions privacy annotations as a key feature (dynamic strings redacted by default in production)",
-          "rationale": "The most important Logger feature that baseline responses almost never mention"
+          "rationale": "Most important Logger feature that baseline almost never mentions"
         },
         {
-          "id": "LS1.4",
+          "id": "PR4.4",
           "text": "Explains that .debug level messages have zero cost in production (compiler optimizes away)",
-          "rationale": "Skill-specific knowledge about Logger performance characteristics"
+          "rationale": "Skill-specific knowledge about Logger performance"
         }
       ]
     },
     {
       "id": 5,
-      "reference": "logger-setup",
-      "name": "logger-setup-medium",
+      "name": "privacy-annotations",
+      "topic": "privacy-annotations",
       "prompt": "What privacy annotations should I use in these Logger calls?\n\n```swift\nlogger.error(\"Request to \\(url) failed for user \\(userId) with token \\(authToken)\")\nlogger.info(\"Saving order \\(orderId) for \\(customerEmail) total \\(amount)\")\n```",
-      "expected_output": "First line: url.absoluteString with .public (URL paths are safe), userId with .private(mask: .hash) (allows correlation without exposing PII), authToken should NOT be logged at all (it's a secret). Second line: orderId with .public (internal identifier), customerEmail with .private(mask: .hash) (PII), amount with .public (numeric, non-identifying). Without annotations, all interpolated strings show as <private> in production logs.",
       "assertions": [
         {
-          "id": "LS2.1",
+          "id": "PA5.1",
           "text": "Identifies that authToken should not be logged at all (or uses .sensitive if logged)",
-          "rationale": "Skill's PII rules: authentication tokens must never appear in logs"
+          "rationale": "Skill PII rules: authentication tokens must never appear in logs"
         },
         {
-          "id": "LS2.2",
+          "id": "PA5.2",
           "text": "Recommends .private(mask: .hash) for userId or customerEmail (not just .private)",
-          "rationale": "Skill teaches mask: .hash for correlation without PII exposure — key differentiator"
+          "rationale": "Skill teaches mask: .hash for correlation without PII exposure"
         },
         {
-          "id": "LS2.3",
+          "id": "PA5.3",
           "text": "Explains that without privacy annotations, production logs show <private> for all interpolated strings",
-          "rationale": "The fundamental reason privacy annotations matter — baseline may not explain default redaction behavior"
+          "rationale": "The fundamental reason privacy annotations matter"
         }
       ]
     },
     {
       "id": 6,
-      "reference": "logger-setup",
-      "name": "logger-setup-complex",
-      "prompt": "We're a health tech app (HIPAA-adjacent). Design a logging strategy that gives us good debugging capability while staying compliant. We use SwiftUI + async/await and talk to a REST API.",
-      "expected_output": "Layered approach: (1) os.Logger with strict privacy annotations — all health data .private, all PII .private(mask: .hash) for correlation, URL paths .public, status codes .public. (2) ErrorReporter protocol abstracting Sentry/Crashlytics — never log PHI in crash report extras. (3) Redactor utility for manual masking in crash SDK context. (4) PrivacyInfo.xcprivacy manifest declaring Required Reason API usage. (5) MetricKit for OOM/hang detection without PII. (6) Five log levels: .debug for dev tracing (free in production), .info for operational context, .notice for key events, .error for failures, .fault for bugs.",
+      "name": "crash-sdk-selection",
+      "topic": "crash-sdk-selection",
+      "prompt": "I want to add crash reporting to my iOS app. Should I use Sentry or Crashlytics? What are the trade-offs?",
       "assertions": [
         {
-          "id": "LS3.1",
-          "text": "Addresses HIPAA/health data compliance specifically in the logging strategy",
-          "rationale": "Skill's PII compliance reference covers health data explicitly"
+          "id": "CS6.1",
+          "text": "Mentions Crashlytics limitation of 8 non-fatal exceptions per session",
+          "rationale": "Skill-specific knowledge — baseline almost never mentions this"
         },
         {
-          "id": "LS3.2",
-          "text": "Recommends PrivacyInfo.xcprivacy manifest (required since May 2024)",
-          "rationale": "Skill covers privacy manifests as mandatory for App Store — baseline often omits this"
+          "id": "CS6.2",
+          "text": "Warns against running both for fatal crash reporting (signal handler conflicts)",
+          "rationale": "Skill covers signal handler conflicts — critical production knowledge"
         },
         {
-          "id": "LS3.3",
-          "text": "Recommends a Redactor utility or @Redacted property wrapper for model-level PII protection",
-          "rationale": "Enterprise pattern from the skill — prevents accidental PII exposure through string interpolation"
-        },
-        {
-          "id": "LS3.4",
-          "text": "Recommends MetricKit alongside crash SDK for out-of-process diagnostics",
-          "rationale": "Skill teaches MetricKit as complementary to crash SDKs — baseline rarely mentions it"
+          "id": "CS6.3",
+          "text": "Recommends wrapping behind a protocol/abstraction layer (ErrorReporter)",
+          "rationale": "Skill architectural pattern — enables vendor swapping and testability"
         }
       ]
     },
     {
       "id": 7,
-      "reference": "crash-sdk-integration",
-      "name": "crash-sdk-simple",
-      "prompt": "I want to add crash reporting to my iOS app. Should I use Sentry or Crashlytics? What are the trade-offs?",
-      "expected_output": "Sentry: richest API — structured breadcrumbs with level/category/data, scope modifications for tags/extras, automatic HTTP/lifecycle/touch breadcrumbs, session replay, performance tracing. Best for teams wanting deep observability. Crashlytics: tight Firebase integration, simpler setup, free tier. Limitation: only stores 8 non-fatal exceptions per session. Best for Firebase-heavy projects. Both: wrap behind an ErrorReporter protocol so you can swap vendors later. Never run both for fatal crashes — signal handler conflict.",
+      "name": "urlsession-status-codes",
+      "topic": "urlsession-status-codes",
+      "prompt": "Add proper error handling with crash reporting to this network call:\n\n```swift\nfunc fetchProducts() async throws -> [Product] {\n    let (data, response) = try await URLSession.shared.data(from: productsURL)\n    return try JSONDecoder().decode([Product].self, from: data)\n}\n```",
       "assertions": [
         {
-          "id": "CS1.1",
-          "text": "Mentions Crashlytics limitation of 8 non-fatal exceptions per session",
-          "rationale": "Skill-specific knowledge about Crashlytics limits — baseline almost never mentions this"
+          "id": "US7.1",
+          "text": "Identifies that URLSession does not throw for HTTP 4xx/5xx (only transport errors throw)",
+          "rationale": "One of the most commonly missed silent failure patterns"
         },
         {
-          "id": "CS1.2",
-          "text": "Warns against running both for fatal crash reporting (signal handler conflicts)",
-          "rationale": "Skill covers signal handler conflicts — critical production knowledge"
+          "id": "US7.2",
+          "text": "Adds breadcrumb before the network request",
+          "rationale": "Skill teaches breadcrumbs before risky operations — baseline never adds breadcrumbs"
         },
         {
-          "id": "CS1.3",
-          "text": "Recommends wrapping behind a protocol/abstraction layer (ErrorReporter)",
-          "rationale": "Skill's architectural pattern — enables vendor swapping and testability"
+          "id": "US7.3",
+          "text": "Uses Logger with privacy annotations (.public for URL path and status code)",
+          "rationale": "Skill mandates privacy annotations — baseline uses print() or bare strings"
+        },
+        {
+          "id": "US7.4",
+          "text": "Calls ErrorReporter.recordNonFatal() or SentrySDK.capture() in the error path",
+          "rationale": "Remote error reporting — core skill requirement"
         }
       ]
     },
     {
       "id": 8,
-      "reference": "crash-sdk-integration",
-      "name": "crash-sdk-medium",
-      "prompt": "Add proper error handling with crash reporting to this network call:\n\n```swift\nfunc fetchProducts() async throws -> [Product] {\n    let (data, response) = try await URLSession.shared.data(from: productsURL)\n    return try JSONDecoder().decode([Product].self, from: data)\n}\n```",
-      "expected_output": "Two issues: (1) URLSession doesn't throw for HTTP 4xx/5xx — must validate statusCode explicitly. (2) No observability — errors propagate with no logging or crash reporting. Fix: check HTTPURLResponse.statusCode, add Logger calls with privacy annotations on the URL path and status code, add ErrorReporter.recordNonFatal() for non-200 responses and decode failures, add breadcrumb before the request.",
-      "assertions": [
-        {
-          "id": "CS2.1",
-          "text": "Identifies that URLSession does not throw for HTTP 4xx/5xx (only transport errors throw)",
-          "rationale": "Skill explicitly covers this — one of the most commonly missed silent failure patterns"
-        },
-        {
-          "id": "CS2.2",
-          "text": "Adds breadcrumb before the network request",
-          "rationale": "Skill teaches breadcrumbs before risky operations — baseline never adds breadcrumbs"
-        },
-        {
-          "id": "CS2.3",
-          "text": "Uses Logger with privacy annotations (.public for URL path and status code)",
-          "rationale": "Skill mandates privacy annotations — baseline uses print() or bare string interpolation"
-        },
-        {
-          "id": "CS2.4",
-          "text": "Calls ErrorReporter.recordNonFatal() or SentrySDK.capture() in the error path",
-          "rationale": "Remote error reporting — the skill's core requirement for every error path"
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "reference": "crash-sdk-integration",
-      "name": "crash-sdk-complex",
+      "name": "dual-sdk-conflicts",
+      "topic": "dual-sdk-conflicts",
       "prompt": "We're using both Sentry and Crashlytics in our iOS app. Crashes sometimes don't appear in either dashboard. What's going wrong and how do we fix it?",
-      "expected_output": "Signal handler conflict: both SDKs install handlers for SIGABRT, SIGSEGV, SIGBUS, and only the last registered receives the signal. NSSetUncaughtExceptionHandler supports only one handler — second call replaces the first. Fix: pick one for fatal crash reporting (disable the other's crash handler), use the secondary only for non-fatals. Example: options.enableCrashHandler = false for Sentry if using Crashlytics for crashes. Also ensure dSYMs are uploaded for both SDKs, and add MetricKit for OOM/watchdog kills that neither in-process reporter catches.",
       "assertions": [
         {
-          "id": "CS3.1",
-          "text": "Identifies signal handler conflict (SIGABRT, SIGSEGV, SIGBUS — only last registered handler receives the signal)",
-          "rationale": "Skill covers this specific technical root cause — baseline may only say 'they conflict'"
+          "id": "DC8.1",
+          "text": "Identifies signal handler conflict (SIGABRT, SIGSEGV, SIGBUS — only last registered receives the signal)",
+          "rationale": "Specific technical root cause"
         },
         {
-          "id": "CS3.2",
-          "text": "Identifies NSSetUncaughtExceptionHandler supports only one handler",
-          "rationale": "Second mechanism that causes conflicts — skill covers this explicitly"
-        },
-        {
-          "id": "CS3.3",
+          "id": "DC8.2",
           "text": "Recommends disabling crash handler on one SDK (e.g., options.enableCrashHandler = false)",
-          "rationale": "Specific actionable fix from the skill — baseline may just say 'remove one SDK'"
+          "rationale": "Actionable fix from the skill"
         },
         {
-          "id": "CS3.4",
+          "id": "DC8.3",
           "text": "Recommends MetricKit for crashes that in-process reporters miss (OOM, watchdog)",
           "rationale": "Skill's layered approach — MetricKit catches what neither SDK can"
         }
       ]
     },
     {
-      "id": 10,
-      "reference": "enterprise-patterns",
-      "name": "enterprise-simple",
+      "id": 9,
+      "name": "centralized-error-handling",
+      "topic": "centralized-error-handling",
       "prompt": "How should I handle errors in SwiftUI views? Right now my catch blocks just set an error string and show an alert.",
-      "expected_output": "Use a centralized ErrorHandler (ObservableObject) injected via environment. Define a CategorizedError protocol with categories: retryable, nonRetryable, requiresLogout. The handler routes errors: retryable triggers retry UI, nonRetryable shows user message and reports non-fatal, requiresLogout clears auth state. Every path logs to Logger and reports to ErrorReporter. This compensates for SwiftUI lacking React-style Error Boundaries.",
       "assertions": [
         {
-          "id": "EP1.1",
+          "id": "CE9.1",
           "text": "Recommends centralized ErrorHandler as ObservableObject with environment injection",
-          "rationale": "Skill's enterprise pattern — baseline typically handles errors per-view"
+          "rationale": "Skill enterprise pattern — baseline handles errors per-view"
         },
         {
-          "id": "EP1.2",
+          "id": "CE9.2",
           "text": "Recommends CategorizedError protocol with retryable/nonRetryable/requiresLogout categories",
-          "rationale": "Skill's error categorization pattern — baseline uses generic error handling"
+          "rationale": "Skill error categorization pattern"
         },
         {
-          "id": "EP1.3",
+          "id": "CE9.3",
           "text": "Mentions SwiftUI lacks Error Boundaries (unlike React) as motivation for centralized handling",
           "rationale": "Skill explicitly calls out this SwiftUI limitation"
         }
       ]
     },
     {
-      "id": 11,
-      "reference": "enterprise-patterns",
-      "name": "enterprise-medium",
+      "id": 10,
+      "name": "retry-with-backoff",
+      "topic": "retry-with-backoff",
       "prompt": "Implement a retry mechanism for network requests that has good observability. We want exponential backoff with jitter.",
-      "expected_output": "Generic retryWithBackoff function: takes maxAttempts, base delay, operation name. Each attempt logged with Logger.warning (attempt number, max attempts, error description with privacy annotations). Breadcrumb added for each failed attempt. Only reports to crash SDK after ALL retries exhausted (prevents noise from transient failures). Uses exponential delay with random jitter (0 to 50% of delay) capped at 60 seconds.",
       "assertions": [
         {
-          "id": "EP2.1",
+          "id": "RB10.1",
           "text": "Reports to crash SDK only after all retries are exhausted (not on each attempt)",
           "rationale": "Skill explicitly teaches this — prevents noise from transient failures"
         },
         {
-          "id": "EP2.2",
+          "id": "RB10.2",
           "text": "Adds breadcrumb for each failed retry attempt",
-          "rationale": "Skill's observability pattern — breadcrumbs provide retry history in crash reports"
+          "rationale": "Breadcrumbs provide retry history in crash reports"
         },
         {
-          "id": "EP2.3",
-          "text": "Uses Logger.warning (not .error) for intermediate retry failures",
-          "rationale": "Skill distinguishes log levels — intermediate failures are warnings, final failure is error"
+          "id": "RB10.3",
+          "text": "Uses Logger at warning level (not error) for intermediate retry failures",
+          "rationale": "Intermediate failures are warnings, final failure is error"
         },
         {
-          "id": "EP2.4",
+          "id": "RB10.4",
           "text": "Includes jitter in the backoff delay (not just pure exponential)",
-          "rationale": "Skill includes jitter to prevent thundering herd — baseline often omits jitter"
+          "rationale": "Jitter prevents thundering herd — baseline often omits it"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "app-extensions",
+      "topic": "app-extensions",
+      "prompt": "Our app has a main app, a widget extension, and a notification service extension. Crashes in the widget and notification extension aren't appearing in our Sentry dashboard. How do we fix this?",
+      "assertions": [
+        {
+          "id": "AE11.1",
+          "text": "Identifies that app extensions run in separate processes (not the main app process)",
+          "rationale": "Root cause — commonly missed"
+        },
+        {
+          "id": "AE11.2",
+          "text": "States crash SDK must be initialized separately in each extension's entry point",
+          "rationale": "The fix — skill provides exact pattern"
+        },
+        {
+          "id": "AE11.3",
+          "text": "Mentions each extension needs its own dSYM upload configuration",
+          "rationale": "Without dSYMs, extension crashes show hex addresses"
+        },
+        {
+          "id": "AE11.4",
+          "text": "Recommends disabling autoSessionTracking in extensions",
+          "rationale": "Extensions don't have normal session lifecycle"
         }
       ]
     },
     {
       "id": 12,
-      "reference": "enterprise-patterns",
-      "name": "enterprise-complex",
-      "prompt": "Our app has a main app, a widget extension, and a notification service extension. Crashes in the widget and notification extension aren't appearing in our Sentry dashboard. How do we fix this?",
-      "expected_output": "App extensions run in separate processes — they have their own memory space and lifecycle. Crash SDK must be initialized separately in each extension's entry point. Each extension target needs its own dSYM upload in build phases. For Crashlytics, each needs its own GoogleService-Info.plist. Use App Groups (UserDefaults(suiteName:)) to share user context and error configuration between main app and extensions. Disable autoSessionTracking in extensions. Also add MetricKit in each extension for OOM detection (extensions have ~50MB memory limit for widgets).",
+      "name": "metrickit-purpose",
+      "topic": "metrickit",
+      "prompt": "What is MetricKit and should I use it alongside Sentry?",
       "assertions": [
         {
-          "id": "EP3.1",
-          "text": "Identifies that app extensions run in separate processes (not the main app process)",
-          "rationale": "Root cause of the problem — skill explicitly covers this commonly missed concern"
+          "id": "MK12.1",
+          "text": "Explains MetricKit runs out-of-process (not inside the app)",
+          "rationale": "Key architectural difference"
         },
         {
-          "id": "EP3.2",
-          "text": "States crash SDK must be initialized separately in each extension's entry point",
-          "rationale": "The fix — skill provides the exact pattern for extension initialization"
+          "id": "MK12.2",
+          "text": "Identifies OOM and watchdog kills as things MetricKit catches that in-process reporters miss",
+          "rationale": "Primary reason for recommending MetricKit"
         },
         {
-          "id": "EP3.3",
-          "text": "Mentions each extension needs its own dSYM upload configuration",
-          "rationale": "Skill covers this — without dSYMs, extension crashes show hex addresses"
+          "id": "MK12.3",
+          "text": "Mentions the opt-in limitation ('Share with App Developers' in Settings)",
+          "rationale": "Critical limitation that affects coverage"
         },
         {
-          "id": "EP3.4",
-          "text": "Recommends App Groups for sharing error config between main app and extensions",
-          "rationale": "Skill's enterprise pattern for multi-process error coordination"
-        },
-        {
-          "id": "EP3.5",
-          "text": "Mentions disabling autoSessionTracking in extensions",
-          "rationale": "Skill-specific detail — extensions don't have normal session lifecycle"
+          "id": "MK12.4",
+          "text": "Recommends using both MetricKit and a third-party crash SDK",
+          "rationale": "Skill's layered approach"
         }
       ]
     },
     {
       "id": 13,
-      "reference": "metrickit",
-      "name": "metrickit-simple",
-      "prompt": "What is MetricKit and should I use it alongside Sentry?",
-      "expected_output": "MetricKit is Apple's first-party diagnostic system that runs out-of-process. It catches OOM terminations, watchdog kills, and background terminations that in-process crash reporters like Sentry miss entirely. Limitation: only receives data from users who opt into 'Share with App Developers'. Sentry captures from all users with rich context and breadcrumbs but misses OOM/watchdog kills. Use both: MetricKit for OS-level diagnostics, Sentry for everything else.",
+      "name": "pii-gdpr-compliance",
+      "topic": "pii-compliance",
+      "prompt": "What should I watch out for with logging and GDPR compliance in my iOS app?",
       "assertions": [
         {
-          "id": "MK1.1",
-          "text": "Explains MetricKit runs out-of-process (not inside the app)",
-          "rationale": "Key architectural difference — this is why it catches what Sentry/Crashlytics miss"
+          "id": "PG13.1",
+          "text": "Mentions operational leaks (HTTP bodies with auth headers, DB queries with user params, URL paths with emails)",
+          "rationale": "Commonly missed PII vectors — baseline only mentions obvious PII"
         },
         {
-          "id": "MK1.2",
-          "text": "Identifies OOM and watchdog kills as things MetricKit catches that in-process reporters miss",
-          "rationale": "Skill's primary reason for recommending MetricKit"
+          "id": "PG13.2",
+          "text": "Mentions PrivacyInfo.xcprivacy manifests required since May 2024",
+          "rationale": "App Store requirement — baseline rarely mentions privacy manifests"
         },
         {
-          "id": "MK1.3",
-          "text": "Mentions the opt-in limitation ('Share with App Developers' in Settings)",
-          "rationale": "Critical limitation that affects coverage — skill explicitly warns about this"
+          "id": "PG13.3",
+          "text": "States crash reporting generally does not require ATT consent",
+          "rationale": "Common confusion — crash diagnostics are not 'tracking'"
         },
         {
-          "id": "MK1.4",
-          "text": "Recommends using both MetricKit and a third-party crash SDK",
-          "rationale": "Skill's layered approach — use both for comprehensive coverage"
+          "id": "PG13.4",
+          "text": "Recommends .private(mask: .hash) for correlation without PII exposure",
+          "rationale": "Specific privacy annotation recommendation"
         }
       ]
     },
     {
       "id": 14,
-      "reference": "objc-exceptions",
-      "name": "objc-exceptions-simple",
-      "prompt": "Will Swift's do/catch handle all errors in my iOS app? Are there exceptions it won't catch?",
-      "expected_output": "No. Swift's do/catch only catches Swift Error types. Objective-C NSExceptions are NOT caught by Swift error handling — they terminate the app without Swift intervening. Common triggers: NSArray out-of-bounds, invalid KVO key paths, unrecognized selectors, Core Data threading violations. Also: Swift traps (force unwrap nil) and EXC_BAD_ACCESS bypass both Swift and ObjC error handling — only signal handlers catch these. Defense: validate inputs before calling ObjC APIs, use crash reporting SDKs that install signal handlers.",
+      "name": "cancellation-error",
+      "topic": "cancellation-error",
+      "prompt": "I'm loading data in a SwiftUI view using .task {}. Sometimes I see CancellationError in my crash reports. Is this a real problem?\n\n```swift\n.task {\n    do {\n        data = try await service.fetch()\n    } catch {\n        ErrorReporter.shared.recordNonFatal(error, context: [\"screen\": \"home\"])\n        showError = true\n    }\n}\n```",
       "assertions": [
         {
-          "id": "OE1.1",
-          "text": "States that Objective-C NSExceptions are NOT caught by Swift do/catch",
-          "rationale": "Fundamental gap in Swift error handling — skill covers this explicitly"
+          "id": "CR14.1",
+          "text": "Explains that .task {} modifier cancels when the view disappears — CancellationError is normal lifecycle behavior",
+          "rationale": "Skill explicitly covers .task cancellation semantics"
         },
         {
-          "id": "OE1.2",
-          "text": "Lists specific NSException triggers (NSArray out-of-bounds, invalid KVO, unrecognized selector)",
-          "rationale": "Skill provides actionable examples — baseline may be vague"
+          "id": "CR14.2",
+          "text": "Recommends catching CancellationError separately before other errors (catch is CancellationError)",
+          "rationale": "Skill pattern: distinguish cancellation from real errors"
         },
         {
-          "id": "OE1.3",
-          "text": "Mentions that Swift traps (force unwrap nil) also bypass do/catch (caught by signal handlers only)",
-          "rationale": "Skill's error type coverage table — shows the full picture"
+          "id": "CR14.3",
+          "text": "States CancellationError should NOT be reported to crash SDK (creates noise)",
+          "rationale": "The actual fix for the problem — stop reporting cancellations"
         }
       ]
     },
     {
       "id": 15,
-      "reference": "pii-compliance",
-      "name": "pii-compliance-simple",
-      "prompt": "What should I watch out for with logging and GDPR compliance in my iOS app?",
-      "expected_output": "GDPR classifies IP addresses, device IDs, and behavioral data as personal information. Never log: passwords, JWT tokens, email addresses, phone numbers, full names, IDFA. Also watch for operational leaks: full HTTP request/response bodies (may contain auth headers), database queries with user parameters, URL paths containing emails. Use os.Logger privacy annotations (.private for PII, .private(mask: .hash) for correlation). PrivacyInfo.xcprivacy manifests are required since May 2024 — apps without them are rejected. Crash reporting generally doesn't require ATT consent if data is only used for improving your app.",
+      "name": "core-data-save",
+      "topic": "core-data-silent-failures",
+      "prompt": "What's wrong with this Core Data save code?\n\n```swift\nfunc saveChanges() {\n    try? viewContext.save()\n}\n```",
       "assertions": [
         {
-          "id": "PC1.1",
-          "text": "Mentions operational leaks (HTTP bodies with auth headers, DB queries with user params, URL paths with emails)",
-          "rationale": "Skill covers commonly missed PII vectors — baseline only mentions obvious PII"
+          "id": "CD15.1",
+          "text": "Identifies try? hiding Core Data validation errors, merge conflicts, and constraint violations",
+          "rationale": "Skill covers Core Data save as a critical try? anti-pattern"
         },
         {
-          "id": "PC1.2",
-          "text": "Mentions PrivacyInfo.xcprivacy manifests required since May 2024",
-          "rationale": "Skill covers this App Store requirement — baseline rarely mentions privacy manifests"
+          "id": "CD15.2",
+          "text": "Shows casting to NSError to extract userInfo and detailedErrors",
+          "rationale": "Skill's Core Data-specific error pattern — NSError has richer info than Error"
         },
         {
-          "id": "PC1.3",
-          "text": "States crash reporting generally does not require ATT consent",
-          "rationale": "Skill clarifies this common confusion — crash diagnostics are not 'tracking'"
+          "id": "CD15.3",
+          "text": "Includes context.rollback() in the error handling",
+          "rationale": "Skill shows rollback as part of Core Data error recovery"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "hipaa-logging-strategy",
+      "topic": "pii-compliance",
+      "prompt": "We're a health tech app (HIPAA-adjacent). Design a logging strategy that gives us good debugging capability while staying compliant. We use SwiftUI + async/await and talk to a REST API.",
+      "assertions": [
+        {
+          "id": "HL16.1",
+          "text": "Addresses HIPAA/health data compliance specifically in the logging strategy",
+          "rationale": "Skill PII compliance reference covers health data explicitly"
         },
         {
-          "id": "PC1.4",
-          "text": "Recommends .private(mask: .hash) for correlation without PII exposure",
-          "rationale": "Skill's specific privacy annotation recommendation — baseline may just say 'don't log PII'"
+          "id": "HL16.2",
+          "text": "Recommends PrivacyInfo.xcprivacy manifest (required since May 2024)",
+          "rationale": "Mandatory for App Store — baseline often omits this"
+        },
+        {
+          "id": "HL16.3",
+          "text": "Recommends a Redactor utility or @Redacted property wrapper for model-level PII protection",
+          "rationale": "Enterprise pattern from the skill"
+        },
+        {
+          "id": "HL16.4",
+          "text": "Recommends MetricKit alongside crash SDK for out-of-process diagnostics",
+          "rationale": "MetricKit as complementary — baseline rarely mentions it"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "background-task-errors",
+      "topic": "background-tasks",
+      "prompt": "Our background sync task sometimes fails silently. Users report data not being up to date. Here's our BGTaskScheduler code:\n\n```swift\nfunc handleSync(task: BGProcessingTask) {\n    Task {\n        try await performSync()\n        task.setTaskCompleted(success: true)\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "BT17.1",
+          "text": "Identifies Task {} without do/catch — if performSync throws, setTaskCompleted is never called",
+          "rationale": "Same Task {} swallowing pattern but in BGTask context"
+        },
+        {
+          "id": "BT17.2",
+          "text": "Recommends adding an expirationHandler to handle system-forced termination",
+          "rationale": "Skill covers BGTask expiration as invisible failure — baseline omits"
+        },
+        {
+          "id": "BT17.3",
+          "text": "Mentions watchdog/SIGKILL for tasks exceeding time limit, detectable only through MetricKit",
+          "rationale": "Skill's layered approach — BGTask kills are out-of-process events"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "objc-bridge-edge-case",
+      "topic": "objc-bridge-edge-case",
+      "prompt": "Will Swift's do/catch handle all errors in my iOS app? Are there exceptions it won't catch?",
+      "assertions": [
+        {
+          "id": "OB18.1",
+          "text": "States that Objective-C NSExceptions are NOT caught by Swift do/catch",
+          "rationale": "Fundamental gap in Swift error handling"
+        },
+        {
+          "id": "OB18.2",
+          "text": "Lists specific NSException triggers (NSArray out-of-bounds, invalid KVO, unrecognized selector)",
+          "rationale": "Actionable examples"
+        },
+        {
+          "id": "OB18.3",
+          "text": "Explains the Swift-ObjC bridge edge case: if ObjC returns non-nil AND sets NSError, Swift catch block never fires",
+          "rationale": "Skill-specific knowledge that baseline never mentions — the bridge behavior where errors are silently lost"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "breadcrumbs-usage",
+      "topic": "breadcrumbs",
+      "prompt": "What are breadcrumbs in crash reporting and when should I add them manually?",
+      "assertions": [
+        {
+          "id": "BC19.1",
+          "text": "Explains breadcrumbs are timestamped events buffered locally and attached to crash/error reports",
+          "rationale": "Skill defines breadcrumbs precisely"
+        },
+        {
+          "id": "BC19.2",
+          "text": "Recommends adding manual breadcrumbs before risky operations (DB migrations, payments, auth flows)",
+          "rationale": "Skill teaches proactive breadcrumb placement"
+        },
+        {
+          "id": "BC19.3",
+          "text": "Mentions Crashlytics breadcrumbs are plain strings only (no structured data) vs Sentry's richer format",
+          "rationale": "Skill-specific limitation knowledge"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "dsym-setup",
+      "topic": "dsym-configuration",
+      "prompt": "Our crash reports in Sentry only show hex addresses like 0x1003a4f8c instead of function names. How do we fix this?",
+      "assertions": [
+        {
+          "id": "DS20.1",
+          "text": "Identifies missing dSYM files as the root cause",
+          "rationale": "Standard knowledge but skill provides checklist"
+        },
+        {
+          "id": "DS20.2",
+          "text": "Specifies Build Settings → Debug Information Format → 'DWARF with dSYM File' for Release configuration",
+          "rationale": "Exact setting path from the skill"
+        },
+        {
+          "id": "DS20.3",
+          "text": "Mentions dSYMs must be configured for ALL targets (main app AND extensions/widgets)",
+          "rationale": "Skill covers multi-target dSYM setup"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "swiftui-task-modifier",
+      "topic": "swiftui-task-modifier",
+      "prompt": "What's wrong with this SwiftUI data loading pattern?\n\n```swift\nstruct ProfileView: View {\n    @State private var profile: Profile?\n    \n    var body: some View {\n        VStack {\n            if let profile { ProfileContent(profile: profile) }\n            else { ProgressView() }\n        }\n        .task {\n            profile = try? await ProfileService.shared.fetch()\n        }\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "ST21.1",
+          "text": "Identifies .task {} signature as non-throwing (async -> Void) — try? hides all errors including network failures",
+          "rationale": "Skill covers .task {} as having no throws signature"
+        },
+        {
+          "id": "ST21.2",
+          "text": "Recommends explicit error state for the UI (not just nil profile)",
+          "rationale": "User sees indefinite loading spinner on failure"
+        },
+        {
+          "id": "ST21.3",
+          "text": "Shows CancellationError handling as separate from real errors in the do/catch",
+          "rationale": "Skill's critical nuance — view disappearing is not a failure"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "operational-pii-leaks",
+      "topic": "operational-pii-leaks",
+      "prompt": "I'm logging my API requests for debugging. Is this safe?\n\n```swift\nlogger.info(\"Request: \\(request.url?.absoluteString ?? \"\") headers: \\(request.allHTTPHeaderFields ?? [:]) body: \\(String(data: request.httpBody ?? Data(), encoding: .utf8) ?? \"\")\")\n```",
+      "assertions": [
+        {
+          "id": "OL22.1",
+          "text": "Identifies HTTP headers as containing Authorization/Bearer tokens that would be logged",
+          "rationale": "Skill covers operational leaks — headers contain auth data"
+        },
+        {
+          "id": "OL22.2",
+          "text": "Identifies HTTP body as potentially containing PII (user data, passwords, personal info)",
+          "rationale": "Skill covers full request/response bodies as PII vectors"
+        },
+        {
+          "id": "OL22.3",
+          "text": "Recommends logging only URL path and status code with privacy annotations, not headers/body",
+          "rationale": "Skill pattern: safe request logging without PII exposure"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "error-reporter-protocol",
+      "topic": "error-reporter-protocol",
+      "prompt": "I'm directly calling SentrySDK.capture() throughout my codebase whenever there's an error. My tech lead says this is wrong. Why?",
+      "assertions": [
+        {
+          "id": "ER23.1",
+          "text": "Recommends wrapping behind an ErrorReporter protocol abstraction",
+          "rationale": "Skill's core architectural pattern — vendor independence"
+        },
+        {
+          "id": "ER23.2",
+          "text": "Explains protocol enables vendor swapping without touching application code",
+          "rationale": "Key benefit — can switch from Sentry to Crashlytics"
+        },
+        {
+          "id": "ER23.3",
+          "text": "Mentions testability benefit (mock ErrorReporter in unit tests)",
+          "rationale": "Skill covers testability as second reason for abstraction"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "combine-error-reporting",
+      "topic": "combine-error-reporting",
+      "prompt": "How do I properly handle and report errors in a Combine pipeline without killing it? Here's my current setup:\n\n```swift\ncancellable = publisher\n    .flatMap { item in\n        processItem(item)\n    }\n    .sink(receiveCompletion: { completion in\n        if case .failure(let error) = completion {\n            print(\"Pipeline failed: \\(error)\")\n        }\n    }, receiveValue: { result in\n        handleResult(result)\n    })\n```",
+      "assertions": [
+        {
+          "id": "CER24.1",
+          "text": "Explains that once receiveCompletion fires with .failure, the pipeline is permanently dead",
+          "rationale": "Skill covers Combine pipeline termination on failure"
+        },
+        {
+          "id": "CER24.2",
+          "text": "Moves error handling inside flatMap with .catch or .tryCatch to keep outer pipeline alive",
+          "rationale": "Skill pattern — error isolation inside flatMap"
+        },
+        {
+          "id": "CER24.3",
+          "text": "Replaces print() with Logger and ErrorReporter in the error path",
+          "rationale": "Skill requires observable error handling in every path"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "mcp-connectivity",
+      "topic": "mcp-connectivity",
+      "prompt": "I'm using Sentry for crash reporting in my iOS app. How can I query my production errors directly from my AI coding assistant during debugging?",
+      "assertions": [
+        {
+          "id": "MC25.1",
+          "text": "Recommends Sentry MCP server for querying issues, events, and stack traces from the IDE",
+          "rationale": "Skill's AI-assisted debugging workflow — unique differentiator"
+        },
+        {
+          "id": "MC25.2",
+          "text": "Provides specific setup instructions (claude mcp add sentry or .mcp.json configuration)",
+          "rationale": "Actionable setup steps from the skill"
+        },
+        {
+          "id": "MC25.3",
+          "text": "Mentions PostHog MCP as alternative/complement for product analytics integration",
+          "rationale": "Skill covers multiple MCP options"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "notification-silent-failures",
+      "topic": "notification-silent-failures",
+      "prompt": "My NotificationCenter observer sometimes doesn't fire. I'm using:\n\n```swift\nfunc setupNotifications() {\n    NotificationCenter.default.addObserver(\n        forName: NSNotification.Name(\"dataUpdated\"),\n        object: nil,\n        queue: .main\n    ) { notification in\n        self.refreshData()\n    }\n}\n```",
+      "assertions": [
+        {
+          "id": "NF26.1",
+          "text": "Identifies that the observer token is not stored — observation may be immediately deallocated",
+          "rationale": "Skill covers NotificationCenter observer token retention"
+        },
+        {
+          "id": "NF26.2",
+          "text": "Identifies string-based notification name as fragile (typos cause silent failure)",
+          "rationale": "Skill covers string-based names as silent failure pattern"
+        },
+        {
+          "id": "NF26.3",
+          "text": "Recommends typed Notification.Name constants",
+          "rationale": "Skill fix — compile-time safety over string literals"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "non-fatal-vs-crash",
+      "topic": "crash-sdk-selection",
+      "prompt": "Should I focus on crash reporting or non-fatal error reporting? What matters more for production iOS apps?",
+      "assertions": [
+        {
+          "id": "NF27.1",
+          "text": "States non-fatal errors affect 10-30%+ of sessions vs crashes at ~1-2%",
+          "rationale": "Skill explicitly quantifies the impact difference"
+        },
+        {
+          "id": "NF27.2",
+          "text": "Emphasizes non-fatal reporting as primary tool for detecting silent failures",
+          "rationale": "Skill's core philosophy — most production errors don't crash"
+        },
+        {
+          "id": "NF27.3",
+          "text": "Mentions Crashlytics 8 non-fatal per session limit as a concern for high-volume apps",
+          "rationale": "Practical limitation that affects non-fatal reporting strategy"
         }
       ]
     }

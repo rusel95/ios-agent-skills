@@ -1,0 +1,24 @@
+{
+  "eval_id": 22,
+  "eval_name": "operational-pii-leaks",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies HTTP headers as containing Authorization/Bearer tokens that would be logged",
+      "passed": true,
+      "evidence": "Matched: ['header', 'token']"
+    },
+    {
+      "text": "Identifies HTTP body as potentially containing PII (user data, passwords, personal info)",
+      "passed": true,
+      "evidence": "Matched: ['body', 'pii']"
+    },
+    {
+      "text": "Recommends logging only URL path and status code with privacy annotations, not headers/body",
+      "passed": true,
+      "evidence": "Matched: ['url', 'privacy:']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

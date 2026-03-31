@@ -1,0 +1,29 @@
+{
+  "eval_id": 4,
+  "eval_name": "print-replacement",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Recommends os.Logger (not OSLog, not custom logging framework, not CocoaLumberjack)",
+      "passed": true,
+      "evidence": "Matched: ['os.logger']"
+    },
+    {
+      "text": "Shows Logger extension pattern with subsystem = Bundle.main.bundleIdentifier and named categories",
+      "passed": true,
+      "evidence": "Matched: ['bundle.main.bundleidentifier', 'category']"
+    },
+    {
+      "text": "Mentions privacy annotations as a key feature (dynamic strings redacted by default in production)",
+      "passed": true,
+      "evidence": "Matched: ['privacy annotation']"
+    },
+    {
+      "text": "Explains that .debug level messages have zero cost in production (compiler optimizes away)",
+      "passed": true,
+      "evidence": "Matched: ['.debug', 'not persisted']"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "GitHub PR Safety Check",
+  "description": "Intercept PR merge and destructive operations to require confirmation",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [".*merge_pull_request.*", ".*delete.*", ".*create_repository.*"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A potentially destructive GitHub operation is about to execute. Before proceeding: 1) Clearly describe WHAT will be changed (repo name, PR number, branch). 2) For merge operations: show PR title, CI status, and number of approvals first. 3) For delete operations: warn that this may be irreversible and repeat the resource name. 4) For repo creation: confirm visibility (public vs private). 5) Explicitly ask the user to confirm with 'yes' before proceeding."
+  }
+}

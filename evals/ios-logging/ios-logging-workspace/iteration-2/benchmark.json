@@ -1,0 +1,751 @@
+{
+  "skill_name": "ios-logging",
+  "model": "sonnet-4.6",
+  "summary": {
+    "with_skill": {
+      "pass": 89,
+      "total": 91,
+      "rate": 97.8
+    },
+    "without_skill": {
+      "pass": 58,
+      "total": 91,
+      "rate": 63.7
+    },
+    "delta": 34.1
+  },
+  "by_topic": {
+    "task-error-swallowing": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    "combine-pipeline-death": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 1,
+        "total": 3,
+        "rate": 33.3
+      },
+      "delta": 66.7
+    },
+    "audit-viewmodel": {
+      "with_skill": {
+        "pass": 5,
+        "total": 5,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 5,
+        "rate": 60.0
+      },
+      "delta": 40.0
+    },
+    "print-replacement": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "privacy-annotations": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "crash-sdk-selection": {
+      "with_skill": {
+        "pass": 5,
+        "total": 6,
+        "rate": 83.3
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 6,
+        "rate": 33.3
+      },
+      "delta": 50.0
+    },
+    "urlsession-status-codes": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    "dual-sdk-conflicts": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "centralized-error-handling": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 0,
+        "total": 3,
+        "rate": 0.0
+      },
+      "delta": 100.0
+    },
+    "retry-with-backoff": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    "app-extensions": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 4,
+        "rate": 75.0
+      },
+      "delta": 25.0
+    },
+    "metrickit": {
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    "pii-compliance": {
+      "with_skill": {
+        "pass": 8,
+        "total": 8,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 8,
+        "rate": 37.5
+      },
+      "delta": 62.5
+    },
+    "cancellation-error": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "core-data-silent-failures": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "background-tasks": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "objc-bridge-edge-case": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "breadcrumbs": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "dsym-configuration": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "swiftui-task-modifier": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "operational-pii-leaks": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "error-reporter-protocol": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    "combine-error-reporting": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    "mcp-connectivity": {
+      "with_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 0.0
+    },
+    "notification-silent-failures": {
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    }
+  },
+  "per_eval": [
+    {
+      "eval_name": "task-error-swallowing",
+      "topic": "task-error-swallowing",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    {
+      "eval_name": "combine-pipeline-death",
+      "topic": "combine-pipeline-death",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 1,
+        "total": 3,
+        "rate": 33.3
+      },
+      "delta": 66.7
+    },
+    {
+      "eval_name": "audit-viewmodel",
+      "topic": "audit-viewmodel",
+      "with_skill": {
+        "pass": 5,
+        "total": 5,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 5,
+        "rate": 60.0
+      },
+      "delta": 40.0
+    },
+    {
+      "eval_name": "print-replacement",
+      "topic": "print-replacement",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "privacy-annotations",
+      "topic": "privacy-annotations",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "crash-sdk-selection",
+      "topic": "crash-sdk-selection",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 0,
+        "total": 3,
+        "rate": 0.0
+      },
+      "delta": 100.0
+    },
+    {
+      "eval_name": "urlsession-status-codes",
+      "topic": "urlsession-status-codes",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    {
+      "eval_name": "dual-sdk-conflicts",
+      "topic": "dual-sdk-conflicts",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "centralized-error-handling",
+      "topic": "centralized-error-handling",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 0,
+        "total": 3,
+        "rate": 0.0
+      },
+      "delta": 100.0
+    },
+    {
+      "eval_name": "retry-with-backoff",
+      "topic": "retry-with-backoff",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    {
+      "eval_name": "app-extensions",
+      "topic": "app-extensions",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 4,
+        "rate": 75.0
+      },
+      "delta": 25.0
+    },
+    {
+      "eval_name": "metrickit-purpose",
+      "topic": "metrickit",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    {
+      "eval_name": "pii-gdpr-compliance",
+      "topic": "pii-compliance",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 1,
+        "total": 4,
+        "rate": 25.0
+      },
+      "delta": 75.0
+    },
+    {
+      "eval_name": "cancellation-error",
+      "topic": "cancellation-error",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "core-data-save",
+      "topic": "core-data-silent-failures",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "hipaa-logging-strategy",
+      "topic": "pii-compliance",
+      "with_skill": {
+        "pass": 4,
+        "total": 4,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 4,
+        "rate": 50.0
+      },
+      "delta": 50.0
+    },
+    {
+      "eval_name": "background-task-errors",
+      "topic": "background-tasks",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "objc-bridge-edge-case",
+      "topic": "objc-bridge-edge-case",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "breadcrumbs-usage",
+      "topic": "breadcrumbs",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "dsym-setup",
+      "topic": "dsym-configuration",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "swiftui-task-modifier",
+      "topic": "swiftui-task-modifier",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "operational-pii-leaks",
+      "topic": "operational-pii-leaks",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "error-reporter-protocol",
+      "topic": "error-reporter-protocol",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "combine-error-reporting",
+      "topic": "combine-error-reporting",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 33.3
+    },
+    {
+      "eval_name": "mcp-connectivity",
+      "topic": "mcp-connectivity",
+      "with_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "notification-silent-failures",
+      "topic": "notification-silent-failures",
+      "with_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "without_skill": {
+        "pass": 3,
+        "total": 3,
+        "rate": 100.0
+      },
+      "delta": 0.0
+    },
+    {
+      "eval_name": "non-fatal-vs-crash",
+      "topic": "crash-sdk-selection",
+      "with_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "without_skill": {
+        "pass": 2,
+        "total": 3,
+        "rate": 66.7
+      },
+      "delta": 0.0
+    }
+  ]
+}

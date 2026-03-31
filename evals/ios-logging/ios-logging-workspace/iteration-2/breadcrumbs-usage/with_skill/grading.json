@@ -1,0 +1,24 @@
+{
+  "eval_id": 19,
+  "eval_name": "breadcrumbs-usage",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Explains breadcrumbs are timestamped events buffered locally and attached to crash/error reports",
+      "passed": true,
+      "evidence": "Matched: ['breadcrumb', 'timestamp']"
+    },
+    {
+      "text": "Recommends adding manual breadcrumbs before risky operations (DB migrations, payments, auth flows)",
+      "passed": true,
+      "evidence": "Matched: ['breadcrumb', 'migration']"
+    },
+    {
+      "text": "Mentions Crashlytics breadcrumbs are plain strings only (no structured data) vs Sentry's richer format",
+      "passed": true,
+      "evidence": "Matched: ['crashlytics', 'log(']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

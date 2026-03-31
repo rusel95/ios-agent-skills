@@ -1,0 +1,24 @@
+{
+  "eval_id": 15,
+  "eval_name": "core-data-save",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies try? hiding Core Data validation errors, merge conflicts, and constraint violations",
+      "passed": true,
+      "evidence": "Matched: ['try?', 'validation']"
+    },
+    {
+      "text": "Shows casting to NSError to extract userInfo and detailedErrors",
+      "passed": true,
+      "evidence": "Matched: ['nserror', 'userinfo']"
+    },
+    {
+      "text": "Includes context.rollback() in the error handling",
+      "passed": true,
+      "evidence": "Matched: ['rollback']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

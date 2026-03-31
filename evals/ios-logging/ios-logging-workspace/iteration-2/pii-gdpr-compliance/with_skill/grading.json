@@ -1,0 +1,29 @@
+{
+  "eval_id": 13,
+  "eval_name": "pii-gdpr-compliance",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Mentions operational leaks (HTTP bodies with auth headers, DB queries with user params, URL paths with emails)",
+      "passed": true,
+      "evidence": "Matched: ['http bod', 'leak']"
+    },
+    {
+      "text": "Mentions PrivacyInfo.xcprivacy manifests required since May 2024",
+      "passed": true,
+      "evidence": "Matched: ['privacyinfo']"
+    },
+    {
+      "text": "States crash reporting generally does not require ATT consent",
+      "passed": true,
+      "evidence": "Matched: ['att', 'not require']"
+    },
+    {
+      "text": "Recommends .private(mask: .hash) for correlation without PII exposure",
+      "passed": true,
+      "evidence": "Matched: [mask: .hash]"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

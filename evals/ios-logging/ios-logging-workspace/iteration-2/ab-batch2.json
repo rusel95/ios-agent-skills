@@ -1,0 +1,83 @@
+[
+  {
+    "eval": "retry-with-backoff",
+    "a_score": 8.8,
+    "b_score": 7.8,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "A provides prerequisites (Logger extension, ErrorReporter protocol), a clear backoff formula table, SwiftUI .task integration with CancellationError handling, error categorization for smart retry decisions, and explains what observability gives you. B builds a full RetryNetworkClient class with OSSignposter and Retry-After header parsing, which is more production-ready as a standalone component, but lacks the broader integration patterns (SwiftUI usage, error categorization, CancellationError). A is more complete and actionable for real-world adoption."
+  },
+  {
+    "eval": "app-extensions",
+    "a_score": 7.6,
+    "b_score": 8.4,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both correctly identify the root cause (extensions are separate processes). B (with_skill) provides a more complete solution: App Groups for shared DSN, dSYM generation steps for each target, memory limit details (50MB), a verification checklist, and a summary table. A covers flush() in serviceExtensionTimeWillExpire and scope tagging, which are useful, but misses dSYM upload requirements for extension targets. B is more thorough on the operational steps needed to actually fix the problem end-to-end."
+  },
+  {
+    "eval": "metrickit-purpose",
+    "a_score": 8.5,
+    "b_score": 7.0,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "A provides precise technical depth: explains out-of-process observation, details specific termination types (OOM, watchdog, background), includes comparison tables for both what Sentry does well and what MetricKit catches, provides working code with pastDiagnosticPayloads handling, and lists key caveats (unsymbolicated stacks, opted-in users only). B is accurate but more surface-level, with less code, no comparison tables, and mentions Sentry SDK's built-in MetricKit integration (a useful but minor point). A is substantially more specific and actionable."
+  },
+  {
+    "eval": "pii-gdpr-compliance",
+    "a_score": 7.4,
+    "b_score": 8.6,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "B (with_skill) is significantly more specific: categorizes data types that must never be logged (auth secrets, high-sensitivity PII), provides concrete Redactor utility code, includes the @Redacted property wrapper, covers Privacy Manifests (required since May 2024), addresses ATT vs crash reporting distinction, covers IDFA vs IDFV, and includes an actionable summary checklist. A covers the right topics (consent, retention, log levels, on-device files) but stays at a higher conceptual level without code examples or iOS-specific implementation details."
+  },
+  {
+    "eval": "cancellation-error",
+    "a_score": 8.4,
+    "b_score": 7.4,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly identify the issue and fix. A goes deeper: explains .task(id:) restarts, adds Logger.networking.error for real errors (dual local+remote logging), provides Task.checkCancellation() pattern for multi-step operations, and has a clear summary table. B is solid and adds a useful note about when frequent cancellations indicate design problems (rapid view reloading, missing caching), but provides less implementation depth. A is more complete on the observability side."
+  },
+  {
+    "eval": "core-data-save",
+    "a_score": 8.2,
+    "b_score": 7.2,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "A",
+    "reasoning": "Surprisingly, A (without_skill) provides os.Logger with privacy annotations, NSDetailedErrorsKey inspection, ErrorReporter.shared.recordNonFatal for remote visibility, context.rollback(), and hasChanges guard. B correctly identifies the issues and adds performAndWait for thread safety (a valid point A misses), but uses print() instead of os.Logger and lacks remote error reporting. A's observability approach is more production-ready despite missing the thread safety consideration."
+  },
+  {
+    "eval": "hipaa-logging-strategy",
+    "a_score": 9.2,
+    "b_score": 8.0,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "A is exceptional: provides a full observability stack overview, PHI classification table, URL sanitization helper, Redactor + @Redacted property wrapper, ErrorReporter protocol with Sentry implementation, centralized ErrorHandler for SwiftUI, complete network layer with PHI considerations, .task CancellationError pattern, retry with backoff, MetricKit setup, PrivacyInfo.xcprivacy manifest, HIPAA compliance checklist table, and Sentry configuration with beforeSend/beforeBreadcrumb PHI scrubbing. B covers audit logging (6-year retention, tamper-evident stores) and remote log collection with OSLogStore, which A omits -- these are important HIPAA-specific topics. However, A is far more comprehensive overall with actionable code for every layer."
+  },
+  {
+    "eval": "background-task-errors",
+    "a_score": 8.6,
+    "b_score": 7.4,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "A",
+    "reasoning": "Both correctly identify the silent failure and setTaskCompleted issue. A (without_skill) provides CancellationError handling as a separate catch, os.Logger with privacy annotations, ErrorReporter.shared.recordNonFatal for remote visibility, breadcrumb in expiration handler, and guidance on diagnosing stale data. B uses print() instead of structured logging, lacks CancellationError distinction, lacks remote error reporting, but adds useful recommendations about making performSync cancellation-aware, scheduling next sync on failure, and validating task registration in Info.plist. A's observability depth is stronger."
+  },
+  {
+    "eval": "objc-bridge-edge-case",
+    "a_score": 8.4,
+    "b_score": 7.8,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly explain that do/catch only catches Swift Error types and not NSExceptions or runtime traps. A includes a coverage table (Swift Error / NSException / Swift trap / EXC_BAD_ACCESS vs handler types), mentions the Swift-ObjC bridge error gotcha (return value vs NSError), integrates MetricKit for out-of-process diagnostics, and uses os.Logger in defensive examples. B provides a complete ObjC exception catcher implementation (ObjCExceptionCatcher.h/.m), covers async/callback-based errors, and is well-structured. Both are strong; A edges ahead on the comprehensive coverage table and bridge edge case specificity."
+  }
+]

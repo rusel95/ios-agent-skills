@@ -1,0 +1,83 @@
+[
+  {
+    "eval": "task-error-swallowing",
+    "a_score": 7.8,
+    "b_score": 9.0,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both correctly identify try? as the problem and provide do/catch fixes. B adds critical production details: os.Logger with privacy annotations (privacy: .private on userId), ErrorReporter.shared.recordNonFatal for remote crash SDK reporting, a structured change table, and the explicit rule that every Task{} with try needs do/catch + Logger + ErrorReporter + user-facing state. A mentions logger.error but without privacy annotations and has no remote error reporting. B is more actionable for production iOS."
+  },
+  {
+    "eval": "combine-pipeline-death",
+    "a_score": 9.2,
+    "b_score": 7.5,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both correctly explain the pipeline death mechanism and the fix (move error handling inside flatMap). A adds retry(2) inside flatMap, os.Logger with privacy annotations, ErrorReporter integration, a debugging tip with handleEvents, and a structured change table. B provides alternative approaches (switchToLatest) which is useful, but its catch block uses print() instead of structured logging -- contradicting best practices. A is significantly more production-complete."
+  },
+  {
+    "eval": "audit-viewmodel",
+    "a_score": 8.2,
+    "b_score": 9.4,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both provide thorough audits identifying all silent failures. B identifies 6 distinct patterns vs A's 4, includes a Logger extension pattern, uses os.Logger with privacy annotations throughout, adds ErrorReporter.shared.recordNonFatal in every catch block, provides a 12-row detailed change table, and includes a view-layer integration checklist with full SwiftUI example. A uses os.log Logger but without privacy annotations and lacks remote error reporting. B is substantially more comprehensive and production-ready."
+  },
+  {
+    "eval": "print-replacement",
+    "a_score": 9.2,
+    "b_score": 7.0,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both explain os.Logger as the replacement for print(). A goes far beyond: privacy annotation cheat sheet with .public/.private/.private(mask:.hash)/.sensitive, systematic print-to-Logger replacement table, ErrorReporter protocol for remote crash reporting, SDK selection guidance (Sentry vs Crashlytics vs PostHog), anti-patterns audit list (try?, Task{} without do/catch, URLSession status codes), and the dual-crash-reporter signal handler warning. B covers Logger basics well and includes OSLog backward compatibility, but lacks remote error reporting, privacy annotation depth, and the anti-pattern audit."
+  },
+  {
+    "eval": "privacy-annotations",
+    "a_score": 6.8,
+    "b_score": 8.8,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both correctly annotate the log calls. Key difference: A marks authToken as .private(mask:.hash), B marks it as .sensitive and explicitly recommends removing it from logs entirely, offering a boolean alternative -- this is the more security-conscious and correct approach for auth tokens. B also uses .private(mask:.hash) on userId and customerEmail for cross-event correlation, provides a decision flowchart, and has stronger 'never log secrets' guidance. A's treatment of authToken as just another private value is a meaningful correctness gap."
+  },
+  {
+    "eval": "crash-sdk-selection",
+    "a_score": 9.0,
+    "b_score": 7.2,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both provide Sentry vs Crashlytics comparison. A includes critical production details B misses: the 8-per-session non-fatal cap in Crashlytics (a major operational concern), structured vs plain-string breadcrumb comparison with code examples, the signal handler conflict warning with specific resolution steps, dSYM requirements for all targets, app extension separate initialization, ErrorReporter protocol abstraction, and MCP server integration mention. B is a competent general comparison but lacks these iOS-specific operational insights."
+  },
+  {
+    "eval": "urlsession-status-codes",
+    "a_score": 7.5,
+    "b_score": 8.8,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "Both add HTTP status code validation and typed NetworkError enums. B leads with the critical insight that URLSession does NOT throw for HTTP errors (only transport failures), uses os.Logger with privacy annotations, includes ErrorReporter.shared.recordNonFatal at every failure point, provides a call-site example with CancellationError handling, a structured change table, and the ErrorReporter protocol reference. A uses a CrashReporter protocol (good) with breadcrumbs but lacks os.Logger integration and privacy annotations. B is more aligned with Apple platform best practices."
+  },
+  {
+    "eval": "dual-sdk-conflicts",
+    "a_score": 9.2,
+    "b_score": 7.5,
+    "a_is": "with_skill",
+    "b_is": "without_skill",
+    "winner": "A",
+    "reasoning": "Both explain signal handler conflicts correctly. A goes significantly deeper: includes MetricKit for out-of-process crash detection (OOM, watchdog kills, thermal kills) with full implementation code, CompositeErrorReporter pattern for fanning non-fatals to both SDKs, dSYM verification steps, and a summary table mapping each problem to its fix. B covers the core conflict well and includes init order advice, but misses MetricKit entirely and lacks the composite reporter pattern. The MetricKit coverage alone is a major differentiator for production completeness."
+  },
+  {
+    "eval": "centralized-error-handling",
+    "a_score": 7.0,
+    "b_score": 9.2,
+    "a_is": "without_skill",
+    "b_is": "with_skill",
+    "winner": "B",
+    "reasoning": "A provides a solid typed error enum, alert binding, reusable ViewModifier, and recovery actions -- a competent SwiftUI error handling pattern. B builds a full centralized ErrorHandler with three critical additions: (1) os.Logger integration with privacy annotations in the handler, (2) ErrorReporter.shared.recordNonFatal for remote crash SDK reporting, (3) error categorization (retryable/nonRetryable/requiresLogout) driving different recovery paths. B also explains the production blindness problem (non-fatals affect 10-30% of sessions silently), includes CancellationError filtering, and provides the ErrorReporter protocol. A is UI-focused; B covers the full observability stack."
+  }
+]

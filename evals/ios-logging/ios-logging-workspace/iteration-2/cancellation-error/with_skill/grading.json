@@ -1,0 +1,24 @@
+{
+  "eval_id": 14,
+  "eval_name": "cancellation-error",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Explains that .task {} modifier cancels when the view disappears \u2014 CancellationError is normal lifecycle behavior",
+      "passed": true,
+      "evidence": "Matched: ['cancellationerror', 'view disappear']"
+    },
+    {
+      "text": "Recommends catching CancellationError separately before other errors (catch is CancellationError)",
+      "passed": true,
+      "evidence": "Matched: ['catch is cancellationerror']"
+    },
+    {
+      "text": "States CancellationError should NOT be reported to crash SDK (creates noise)",
+      "passed": true,
+      "evidence": "Matched: ['cancellation', 'not report']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

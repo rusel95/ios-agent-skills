@@ -1,0 +1,29 @@
+{
+  "eval_id": 10,
+  "eval_name": "retry-with-backoff",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Reports to crash SDK only after all retries are exhausted (not on each attempt)",
+      "passed": true,
+      "evidence": "Matched: ['after all retries', 'report']"
+    },
+    {
+      "text": "Adds breadcrumb for each failed retry attempt",
+      "passed": true,
+      "evidence": "Matched: ['breadcrumb', 'retry']"
+    },
+    {
+      "text": "Uses Logger at warning level (not error) for intermediate retry failures",
+      "passed": true,
+      "evidence": "Matched: ['.warning', 'retry']"
+    },
+    {
+      "text": "Includes jitter in the backoff delay (not just pure exponential)",
+      "passed": true,
+      "evidence": "Matched: ['jitter', 'random']"
+    }
+  ],
+  "pass_count": 4,
+  "total": 4
+}

@@ -1,0 +1,24 @@
+{
+  "eval_id": 21,
+  "eval_name": "swiftui-task-modifier",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies .task {} signature as non-throwing (async -> Void) \u2014 try? hides all errors including network failures",
+      "passed": true,
+      "evidence": "Matched: ['.task', 'async -> void']"
+    },
+    {
+      "text": "Recommends explicit error state for the UI (not just nil profile)",
+      "passed": true,
+      "evidence": "Matched: ['error state']"
+    },
+    {
+      "text": "Shows CancellationError handling as separate from real errors in the do/catch",
+      "passed": true,
+      "evidence": "Matched: ['cancellationerror', 'distinguish']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

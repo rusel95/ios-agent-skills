@@ -1,0 +1,29 @@
+{
+  "eval_id": 16,
+  "eval_name": "hipaa-logging-strategy",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Addresses HIPAA/health data compliance specifically in the logging strategy",
+      "passed": true,
+      "evidence": "Matched: ['hipaa']"
+    },
+    {
+      "text": "Recommends PrivacyInfo.xcprivacy manifest (required since May 2024)",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['privacyinfo']"
+    },
+    {
+      "text": "Recommends a Redactor utility or @Redacted property wrapper for model-level PII protection",
+      "passed": true,
+      "evidence": "Matched: ['redaction', 'string']"
+    },
+    {
+      "text": "Recommends MetricKit alongside crash SDK for out-of-process diagnostics",
+      "passed": false,
+      "evidence": "Matched: [], Missing group containing: ['metrickit']"
+    }
+  ],
+  "pass_count": 2,
+  "total": 4
+}

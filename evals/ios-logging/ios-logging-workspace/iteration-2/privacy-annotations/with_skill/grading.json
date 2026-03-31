@@ -1,0 +1,24 @@
+{
+  "eval_id": 5,
+  "eval_name": "privacy-annotations",
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Identifies that authToken should not be logged at all (or uses .sensitive if logged)",
+      "passed": true,
+      "evidence": "Matched: ['authtoken', 'should not']"
+    },
+    {
+      "text": "Recommends .private(mask: .hash) for userId or customerEmail (not just .private)",
+      "passed": true,
+      "evidence": "Matched: [mask: .hash]"
+    },
+    {
+      "text": "Explains that without privacy annotations, production logs show <private> for all interpolated strings",
+      "passed": true,
+      "evidence": "Matched: ['<private>', 'production']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

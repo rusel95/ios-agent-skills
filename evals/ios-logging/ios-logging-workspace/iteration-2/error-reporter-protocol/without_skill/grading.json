@@ -1,0 +1,24 @@
+{
+  "eval_id": 23,
+  "eval_name": "error-reporter-protocol",
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Recommends wrapping behind an ErrorReporter protocol abstraction",
+      "passed": true,
+      "evidence": "Matched: ['protocol']"
+    },
+    {
+      "text": "Explains protocol enables vendor swapping without touching application code",
+      "passed": true,
+      "evidence": "Matched: ['switch']"
+    },
+    {
+      "text": "Mentions testability benefit (mock ErrorReporter in unit tests)",
+      "passed": true,
+      "evidence": "Matched: ['test']"
+    }
+  ],
+  "pass_count": 3,
+  "total": 3
+}

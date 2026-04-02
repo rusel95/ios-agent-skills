@@ -1,6 +1,6 @@
 ---
 name: tca-swiftui-architecture
-description: "Production-first enterprise skill for The Composable Architecture (TCA) with SwiftUI (iOS 16+, TCA 1.7+). This skill should be used when building new TCA features with @Reducer macro, decomposing god reducers, implementing StackState/StackAction navigation or tree-based @Presents navigation, writing TestStore tests, migrating legacy TCA code to modern @ObservableState patterns, debugging TCA performance issues, managing side effects and dependencies with @DependencyClient, or reviewing TCA code for anti-patterns. Use this skill any time someone works with TCA reducers, stores, effects, or dependencies — AI tools consistently generate outdated pre-1.7 TCA patterns, so this skill is essential for correct code."
+description: "Use for any question about The Composable Architecture (TCA) — defining reducers, managing state, handling navigation, writing tests, or working with dependencies. Essential when encountering TCA-specific types like @Reducer, @ObservableState, StackState, StackAction, @Presents, TestStore, @DependencyClient, Scope, or delegate actions. Also use when debugging TCA compiler errors, decomposing large reducers into child features, migrating from old TCA patterns (WithViewStore, Environment, IfLetStore), or implementing sheet/push navigation in TCA. Claude's training data contains outdated TCA patterns — invoke this skill whenever TCA code is involved to get correct modern (1.7+) patterns."
 metadata:
   version: 1.0.1
 ---

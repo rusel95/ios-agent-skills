@@ -1,6 +1,6 @@
 ---
 name: ios-security-audit
-description: "Enterprise skill for iOS security auditing against OWASP MASVS v2.1.0 (24 controls, 8 categories). This skill should be used when reviewing iOS code for security vulnerabilities, auditing Keychain and storage usage, checking ATS and network configuration, detecting hardcoded secrets or weak cryptography, validating certificate pinning, auditing WebView security, checking biometric auth, or mapping compliance requirements (HIPAA, PCI DSS, GDPR, SOC 2). Use this skill any time someone asks for a security review, vulnerability check, pre-release security gate, or compliance audit of an iOS codebase — even if they only say 'check my code' or 'is this secure.'"
+description: "Use for any iOS security question — whether you're asking about a specific vulnerability, checking if a pattern is secure, or running a full audit. Triggers on: Keychain vs UserDefaults decisions, ATS/NSAllowsArbitraryLoads configuration, certificate pinning implementation, WebView security (UIWebView, WKWebView), hardcoded secrets or API keys, jailbreak/tamper detection, biometric authentication, MASVS controls, OWASP mobile security, App Store rejection risks, and compliance requirements (HIPAA, PCI DSS, GDPR). Also use when someone asks 'is this secure?', 'what should I use instead?', or 'how do I fix this?' about any iOS storage, network, or cryptography pattern."
 metadata:
   version: 1.1.3
 ---
@@ -231,7 +231,7 @@ Does the app handle financial, health, government, or payment data?
 
 ### Cost Optimization for Large Codebases
 
-Full audits on large codebases (500+ Swift files) consume significant tokens. Use a tiered approach:
+Full audits on large codebases (500+ Swift files) consume significant tokens. Use a phased approach:
 
 1. **Run `scripts/quick-scan.sh` first** — zero token cost, whole-repo grep for CRITICAL/HIGH patterns across every file. Paste output into the conversation.
 2. **Agent scans in parallel with own tools** — grep-based CRITICAL/HIGH detection using search tools covers patterns requiring context the script misses (multi-line calls, indirect key references, data-flow). Both together = maximum depth.

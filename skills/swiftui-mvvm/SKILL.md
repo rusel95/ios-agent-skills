@@ -1,6 +1,6 @@
 ---
 name: swiftui-mvvm-architecture
-description: "Production-first enterprise skill for SwiftUI MVVM architecture with @Observable (iOS 17+). This skill should be used when creating new SwiftUI screens, refactoring legacy SwiftUI codebases to modern MVVM through phased low-risk PRs tracked in a `refactoring/` directory, migrating from ObservableObject to @Observable, setting up Router navigation, implementing dependency injection, building networking layers with ViewState enum, or writing ViewModel tests. Use this skill any time someone is working with SwiftUI ViewModels, @Observable, @State/@Bindable ownership, NavigationStack routing, or SwiftUI architecture decisions — even if they don't explicitly mention 'MVVM.'"
+description: "Use this skill when working with SwiftUI ViewModels — creating, refactoring, or testing them. Triggers for: setting up a ViewModel for a SwiftUI screen, extracting logic from a View into a ViewModel, migrating from ObservableObject to @Observable, modeling async state (instead of separate Bool flags like isLoading/hasError), injecting dependencies into ViewModels, writing unit tests for @Observable ViewModels, NavigationStack/Router setup, or any question about SwiftUI app architecture. Also use when a SwiftUI View imports too much business logic, when someone asks how to structure a SwiftUI screen 'the modern way,' or when they ask about @State/@Bindable ownership, ViewState patterns, or why their ViewModel shouldn't import SwiftUI."
 metadata:
   version: 1.0.2
 ---

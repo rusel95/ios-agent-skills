@@ -22,41 +22,21 @@
 
 Every skill is benchmarked against multiple LLMs with discriminating assertions and blind A/B quality scoring.
 
-### Binary assertion delta (with skill vs without)
+| Skill | Sonnet 4.6 delta | Sonnet 4.6 A/B | GPT-5.4 delta | Gemini 3.1 Pro delta |
+|-------|:-:|:-:|:-:|:-:|
+| **swiftui-mvvm** | ![](https://img.shields.io/badge/+11.1%25-555?style=flat-square&logo=swift&logoColor=white) | 9W 15T 0L · 9.2↑8.8 (+0.4) | ![](https://img.shields.io/badge/+40.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+76.0%25-007AFF?style=flat-square&logo=swift&logoColor=white) |
+| **uikit-mvvm** | ![](https://img.shields.io/badge/+13.7%25-555?style=flat-square&logo=swift&logoColor=white) | 20W 2T 2L · 9.1↑8.2 (+0.9) | ![](https://img.shields.io/badge/+40.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+54.9%25-34C759?style=flat-square&logo=swift&logoColor=white) |
+| **gcd-operations** | ![](https://img.shields.io/badge/+47.4%25-5AC8FA?style=flat-square&logo=swift&logoColor=white) | 15W 9T 0L · 8.6↑8.1 (+0.5) | ![](https://img.shields.io/badge/+4.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+16.1%25-555?style=flat-square&logo=swift&logoColor=white) |
+| **ios-testing** | ![](https://img.shields.io/badge/+44.2%25-FFD60A?style=flat-square&logo=swift&logoColor=black) | 23W 7T 0L · 8.9↑8.0 (+0.9) | ![](https://img.shields.io/badge/+30.0%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+33.6%25-555?style=flat-square&logo=swift&logoColor=white) |
+| **swift-concurrency** | ![](https://img.shields.io/badge/+32.5%25-555?style=flat-square&logo=swift&logoColor=white) | 15W 9T 0L · 8.9↑8.5 (+0.4) | ![](https://img.shields.io/badge/+17.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+35.6%25-FF2D55?style=flat-square&logo=swift&logoColor=white) |
+| **ios-security** | ![](https://img.shields.io/badge/+29.7%25-FF3B30?style=flat-square&logo=swift&logoColor=white) | 9W 15T 0L · 9.3↑8.9 (+0.4) | ![](https://img.shields.io/badge/+26.4%25-555?style=flat-square&logo=swift&logoColor=white) | — |
+| **tca-swiftui** | ![](https://img.shields.io/badge/+25.9%25-AF52DE?style=flat-square&logo=swift&logoColor=white) | 14W 2T 4L · 8.7↑7.8 (+0.9) | — | — |
+| **ios-logging** | ![](https://img.shields.io/badge/+34.1%25-8E8E93?style=flat-square&logo=swift&logoColor=white) | 25W 0T 2L · 8.6↑7.4 (+1.2) | — | — |
+| **ios-accessibility** | ![](https://img.shields.io/badge/+18.3%25-00C7BE?style=flat-square&logo=swift&logoColor=white) | 21W 15T 0L · 8.8↑7.9 (+0.9) | — | — |
+| **viper-uikit** | ![](https://img.shields.io/badge/+13.4%25-FF9500?style=flat-square&logo=swift&logoColor=white) | 15W 1T 0L · 9.4↑8.2 (+1.2) | — | — |
+| **ios-localization** | ![](https://img.shields.io/badge/+1.9%25-555?style=flat-square&logo=swift&logoColor=white) | 27W 0T 9L · 8.4↑7.6 (+0.8) | — | — |
 
-| Skill | Sonnet 4.6 | GPT-5.4 | Gemini 3.1 Pro |
-|-------|:-:|:-:|:-:|
-| **swiftui-mvvm** | ![](https://img.shields.io/badge/+11.1%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+40.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+76.0%25-007AFF?style=flat-square&logo=swift&logoColor=white) |
-| **uikit-mvvm** | ![](https://img.shields.io/badge/+13.7%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+40.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+54.9%25-34C759?style=flat-square&logo=swift&logoColor=white) |
-| **gcd-operations** | ![](https://img.shields.io/badge/+47.4%25-5AC8FA?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+4.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+16.1%25-555?style=flat-square&logo=swift&logoColor=white) |
-| **ios-testing** | ![](https://img.shields.io/badge/+44.2%25-FFD60A?style=flat-square&logo=swift&logoColor=black) | ![](https://img.shields.io/badge/+30.0%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+33.6%25-555?style=flat-square&logo=swift&logoColor=white) |
-| **swift-concurrency** | ![](https://img.shields.io/badge/+32.5%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+17.8%25-555?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+35.6%25-FF2D55?style=flat-square&logo=swift&logoColor=white) |
-| **ios-security** | ![](https://img.shields.io/badge/+29.7%25-FF3B30?style=flat-square&logo=swift&logoColor=white) | ![](https://img.shields.io/badge/+26.4%25-555?style=flat-square&logo=swift&logoColor=white) | — |
-| **tca-swiftui** | ![](https://img.shields.io/badge/+25.9%25-AF52DE?style=flat-square&logo=swift&logoColor=white) | — | — |
-| **ios-logging** | ![](https://img.shields.io/badge/+34.1%25-8E8E93?style=flat-square&logo=swift&logoColor=white) | — | — |
-| **ios-accessibility** | ![](https://img.shields.io/badge/+18.3%25-00C7BE?style=flat-square&logo=swift&logoColor=white) | — | — |
-| **viper-uikit** | ![](https://img.shields.io/badge/+13.4%25-FF9500?style=flat-square&logo=swift&logoColor=white) | — | — |
-| **ios-localization** | ![](https://img.shields.io/badge/+1.9%25-555?style=flat-square&logo=swift&logoColor=white) | — | — |
-
-> Colored badge = best result for that skill. "—" = not yet benchmarked for that model.
-
-### Blind A/B quality scoring (W/T/L · score with↑without)
-
-| Skill | Sonnet 4.6 |
-|-------|:-:|
-| **swiftui-mvvm** | 9W 15T 0L · 9.2↑8.8 (+0.4) |
-| **uikit-mvvm** | 20W 2T 2L · 9.1↑8.2 (+0.9) |
-| **gcd-operations** | 15W 9T 0L · 8.6↑8.1 (+0.5) |
-| **ios-testing** | 23W 7T 0L · 8.9↑8.0 (+0.9) |
-| **swift-concurrency** | 15W 9T 0L · 8.9↑8.5 (+0.4) |
-| **ios-security** | 9W 15T 0L · 9.3↑8.9 (+0.4) |
-| **tca-swiftui** | 14W 2T 4L · 8.7↑7.8 (+0.9) |
-| **ios-logging** | 25W 0T 2L · 8.6↑7.4 (+1.2) |
-| **ios-accessibility** | 21W 15T 0L · 8.8↑7.9 (+0.9) |
-| **viper-uikit** | 15W 1T 0L · 9.4↑8.2 (+1.2) |
-| **ios-localization** | 27W 0T 9L · 8.4↑7.6 (+0.8) |
-
-> Blind judge scores both responses 0–10 without knowing which used the skill; position randomized per eval. **W = skill wins · T = tie · L = baseline wins.**
+> Delta = assertion pass rate improvement (with skill vs without). Colored badge = best result for that skill. A/B: blind judge scores both responses 0–10 without knowing which used the skill; position randomized. **W = skill wins · T = tie · L = baseline wins.**
 
 See [BENCHMARKING.md](BENCHMARKING.md) for full methodology.
 

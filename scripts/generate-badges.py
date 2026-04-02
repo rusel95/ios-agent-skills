@@ -3,11 +3,11 @@
 
 Reads hit counts per path from the GoatCounter API and writes one
 shields.io-compatible endpoint JSON per tracked action to public/badges/.
-GitLab Pages then serves those files so shields.io can render live badges.
+GitHub Pages serves those files so shields.io can render live badges.
 
-Required environment variables (set as GitLab CI/CD Variables):
+Required environment variables:
     GOATCOUNTER_CODE        Site code chosen during registration
-                            (e.g. "epam-agent-skills")
+                            (e.g. "ios-agent-skills")
     GOATCOUNTER_API_TOKEN   API token from GoatCounter Settings → API
 
 Optional:

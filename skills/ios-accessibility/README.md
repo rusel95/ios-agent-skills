@@ -10,40 +10,40 @@ Tested on **36 scenarios** with **115 discriminating assertions** across 12 topi
 
 | Model | With Skill | Without Skill | Delta | A/B Quality |
 | --- | --- | --- | --- | --- |
-| **Sonnet 4.6** | 115/115 (100%) | 94/115 (81.7%) | **+18.3%** | **35W 0T 1L** (avg 8.9 vs 7.4) |
-| **GPT-5.4** | — | — | — | — |
-| **Gemini 3.1 Pro** | — | — | — | — |
+| **Sonnet 4.6** | 94/115 (81.7%) | 94/115 (81.7%) | **+0.0%** | **27W 5T 4L** (avg 8.5 vs 7.9) |
+| **GPT-5.4** | 113/115 (98.3%) | 101/115 (87.8%) | **+10.4%** | **31W 1T 4L** (avg 9.2 vs 8.5) |
+| **Gemini 3.1 Pro** | 115/115 (100%) | 85/115 (73.9%) | **+26.1%** | **36W** 0T 0L (avg 9.0 vs 7.2) |
 
 > Delta = percentage point improvement in discriminating assertion pass rate (with skill vs without skill). A/B Quality: blind judge scores each response 0–10. "—" = not yet benchmarked.
+> **Note on GPT-5.4:** Strict regrading of the regenerated GPT-5.4 responses gives 113/115 (98.3%) with the skill vs 101/115 (87.8%) without (+10.4%). The recovered gaps are concentrated in WCAG 2.2 mapping, UIKit accessibility structures, custom-action return values, and system-preference edge cases. Two with-skill misses remain: an explicit `.foregroundColor` deprecation callout and a direct 7:1 Increase Contrast statement. Blind A/B also favors the skill clearly at 31W 1T 4L with average quality 9.2 vs 8.5.
 
 ### Results (Sonnet 4.6)
 
 | Metric | Value |
 | --- | --- |
-| With Skill | **115/115 (100%)** |
+| With Skill | **94/115 (81.7%)** |
 | Without Skill | 94/115 (81.7%) |
-| Delta | **+18.3%** |
-| Discriminating assertions | 21 (WITH wins), 0 (WITHOUT wins) |
-| A/B Quality | **35W 0T 1L** (avg 8.9 vs 7.4) |
+| Delta | **+0.0%** |
+| A/B Quality | **27W 5T 4L** (avg 8.5 vs 7.9) |
 
-**Interpretation:** The skill achieves perfect pass rate (100%) across all 115 assertions. The baseline misses 21 assertions — concentrated in WCAG 2.2 new criteria, system preference checks (legibilityWeight, colorSchemeContrast, reduceTransparency), @ScaledMetric for icons, Screen Curtain testing, Large Content Viewer patterns, and accessibilityPerformEscape for modal dismiss.
+**Interpretation:** Sonnet 4.6 already has strong iOS accessibility knowledge — the baseline passes 81.7% of assertions. The assertion delta is 0%: the skill produces 3 topic wins (color-contrast, swiftui-controls, voiceover-grouping) offset by 3 regressions (motion-preferences, uikit-controls, wcag-mapping). However, the A/B quality scoring shows the skill consistently produces better responses (27 wins, 4 losses) — the advantage is in depth, WCAG 2.2 coverage, and edge-case examples rather than missing core knowledge.
 
 ### Topic Breakdown
 
 | Topic | With Skill | Without Skill | Delta | Assertions |
 | --- | --- | --- | --- | --- |
-| wcag-mapping | 100.0% | 66.7% | **+33.3%** | 9 |
-| dynamic-type | 100.0% | 70.0% | **+30.0%** | 10 |
-| motion-preferences | 100.0% | 70.0% | **+30.0%** | 10 |
-| swiftui-controls | 100.0% | 70.0% | **+30.0%** | 10 |
-| system-preferences | 100.0% | 77.8% | **+22.2%** | 9 |
-| voiceover-actions | 100.0% | 80.0% | **+20.0%** | 10 |
-| voiceover-labels | 100.0% | 80.0% | **+20.0%** | 10 |
-| voiceover-grouping | 100.0% | 88.9% | **+11.1%** | 9 |
-| voiceover-traits | 100.0% | 88.9% | **+11.1%** | 9 |
-| color-contrast | 100.0% | 90.0% | **+10.0%** | 10 |
-| testing | 100.0% | 100.0% | 0.0% | 9 |
-| uikit-controls | 100.0% | 100.0% | 0.0% | 10 |
+| voiceover-labels | 100.0% | 100.0% | 0.0% | 10 |
+| voiceover-traits | 100.0% | 100.0% | 0.0% | 9 |
+| motion-preferences | 90.0% | 100.0% | **-10.0%** | 10 |
+| swiftui-controls | 90.0% | 80.0% | **+10.0%** | 10 |
+| uikit-controls | 80.0% | 90.0% | **-10.0%** | 10 |
+| voiceover-grouping | 88.9% | 77.8% | **+11.1%** | 9 |
+| voiceover-actions | 80.0% | 80.0% | 0.0% | 10 |
+| system-preferences | 77.8% | 77.8% | 0.0% | 9 |
+| dynamic-type | 70.0% | 70.0% | 0.0% | 10 |
+| color-contrast | 70.0% | 60.0% | **+10.0%** | 10 |
+| testing | 88.9% | 88.9% | 0.0% | 9 |
+| wcag-mapping | 44.4% | 55.6% | **-11.1%** | 9 |
 
 ### Key Discriminating Assertions (21 — missed WITHOUT skill, all passed WITH)
 

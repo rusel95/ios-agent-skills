@@ -4,15 +4,15 @@ Enterprise-grade concurrency skill for Grand Central Dispatch and OperationQueue
 
 ## Benchmark Results
 
-Tested on **13 scenarios** with **19 discriminating assertions**.
+Tested on **24 scenarios** with **62 discriminating assertions**.
 
 ### Results Summary
 
 | Model | With Skill | Without Skill | Delta | A/B Quality |
 | --- | --- | --- | --- | --- |
-| **Sonnet 4.6** | 19/19 (100%) | 10/19 (52.6%) | **+47.4%** | **15W 9T 0L** (avg 8.6 vs 8.1) |
-| **GPT-5.4** | 100% | 95.2% | **+4.8%** | **24/24 wins** (avg 9.0 vs 7.3) |
-| **Gemini 3.1 Pro** | 100% | 83.9% | **+16.1%** | **10/24 wins**, 13 ties, 1 loss (avg 8.0 vs 7.6) |
+| **Sonnet 4.6** | 62/62 (100%) | 58/62 (93.5%) | **+6.5%** | **15W 9T 0L** (avg 8.6 vs 8.1) |
+| **GPT-5.4** | 60/62 (96.8%) | 55/62 (88.7%) | **+8.1%** | **18W 1T 5L** (avg 8.6 vs 7.8) |
+| **Gemini 3.1 Pro** | 19/19 (100%) | 5/19 (26.3%) | **+74.0%** | **12W** 0T 1L (avg 8.8 vs 7.1) |
 
 > A/B Quality: blind judge scores each response 0–10 and picks the better one without knowing which used the skill. Position (A/B) is randomized across evals to prevent bias.
 
@@ -20,38 +20,27 @@ Tested on **13 scenarios** with **19 discriminating assertions**.
 
 | Metric | Value |
 | --- | --- |
-| With Skill | 19/19 (100%) |
-| Without Skill | 10/19 (52.6%) |
-| Delta | **+47.4%** |
+| With Skill | 62/62 (100%) |
+| Without Skill | 58/62 (93.5%) |
+| Delta | **+6.5%** |
 | A/B Quality | **15W 9T 0L** (avg 8.6 vs 8.1) |
 
-**Interpretation:** Sonnet 4.6 without the skill misses 9 of 19 assertions that it consistently passes with the skill. The +47.4% delta reveals that while Sonnet knows GCD basics, it misses Apple-specific production details — WWDC 2017-706 queue architecture guidance, target-queue deadlock patterns, `.background` behavior in Low Power Mode, barriers silently ignored on global queues, AsyncOperation KVO requirements, and `dispatchPrecondition` as a proactive debugging guard. A/B confirms with 15 wins and zero losses.
+**Interpretation:** Sonnet 4.6 has a strong GCD baseline (93.5%) — it knows most patterns. The skill adds the 4 assertions it misses: WWDC 2017-706 queue architecture guidance, `.background` halting in Low Power Mode, `dispatchPrecondition` removed in release builds, and specific lock selection rationale. A/B confirms with 15 wins and zero losses.
 
 ### Results (GPT-5.4)
 
-| Difficulty | With Skill | Without Skill | Delta | A/B Quality (with vs without) |
-| --- | --- | --- | --- | --- |
-| Simple | 10/10 (100%) | 10/10 (100%) | **0%** | **8/8 wins** (avg 8.5 vs 6.9) |
-| Medium | 22/22 (100%) | 20/22 (90.9%) | **+9.1%** | **8/8 wins** (avg 9.2 vs 7.2) |
-| Complex | 30/30 (100%) | 29/30 (96.7%) | **+3.3%** | **8/8 wins** (avg 9.4 vs 7.7) |
-| **Total** | **62/62 (100%)** | **59/62 (95.2%)** | **+4.8%** | **24/24 wins** (avg 9.0 vs 7.3) |
+| Metric | Value |
+| --- | --- |
+| With Skill | 60/62 (96.8%) |
+| Without Skill | 55/62 (88.7%) |
+| Delta | **+8.1%** |
+| A/B | **18W 1T 5L** (avg 8.6 vs 7.8) |
 
-### Results (Gemini 3.1 Pro)
-
-| Difficulty | With Skill | Without Skill | Delta |
-| --- | --- | --- | --- |
-| Simple | 10/10 (100%) | 10/10 (100%) | **0%** |
-| Medium | 22/22 (100%) | 17/22 (77.3%) | **+22.7%** |
-| Complex | 30/30 (100%) | 25/30 (83.3%) | **+16.7%** |
-| **Total** | **62/62 (100%)** | **52/62 (83.9%)** | **+16.1%** |
-
-**Interpretation:** Most models handle GCD basics cleanly. The skill adds value at the Apple-specific and production-hardening layer. GPT-5.4 is a very strong baseline (95.2% without skill) — only 3 specific nuances remain reliably skill-dependent for that model.
+**Interpretation:** On the refreshed strict regrade, GPT-5.4 is a strong GCD baseline at 88.7% without the skill and rises to 96.8% with it. The recovered gaps are concrete implementation details: tracing TSan call paths back to the racing access sites, balanced `DispatchGroup` cleanup on early returns, global-queue barrier misuse, missing KVO notifications in `AsyncOperation`, and unsafe stored `os_unfair_lock` usage. Two with-skill misses remain: it still does not explicitly call out the original missing `isCancelled` check in `operation-queue-complex`, and it discusses blocking I/O without directly stating that `Data(contentsOf:)` worsens thread explosion. Blind A/B also favors the skill at 18W 1T 5L with higher average quality (8.6 vs 7.8).
 
 > Raw data:
-> `gcd-operationqueue-workspace/iteration-3/benchmark-gpt-5-4-tiered.json` (3 runs, majority vote)
-> `gcd-operationqueue-workspace/iteration-2/benchmark-sonnet-4-6.json`
-> `gcd-operationqueue-workspace/iteration-2/benchmark-opus-4-5-tiered.json`
-> `gcd-operationqueue-workspace/iteration-2/benchmark-gemini-3-1-pro-tiered.json`
+> `workspaces/ios/gcd-operationqueue/iteration-2/benchmark-gpt-5-4.json`
+> `gcd-operationqueue-workspace/benchmark-sonnet-4-6.json`
 
 ### Benchmark Cost Estimate
 
@@ -61,37 +50,23 @@ Tested on **13 scenarios** with **19 discriminating assertions**.
 | Eval runs (without_skill) | 24 × 12k | 288k |
 | Grading (48 runs × 5k) | 48 × 5k | 240k |
 | **Total** | | **~1.4M** |
-| **Est. cost (Opus 4.5)** | ~$30/1M | **~$41** |
 | **Est. cost (Sonnet 4.6)** | ~$5.4/1M | **~$8** |
 
-> Token estimates based on sampled timing.json files. Blended rate ~$30/1M for Opus ($15 input + $75 output, ~80/20 ratio); ~$5.4/1M for Sonnet 4.6 ($3 input + $15 output, ~80/20 ratio).
+> Token estimates based on sampled timing.json files. Blended rate ~$5.4/1M for Sonnet 4.6 ($3 input + $15 output, ~80/20 ratio).
 
 ### Key Discriminating Assertions (GPT-5.4 — missed without skill)
 
-GPT-5.4 is now an extremely strong baseline — 95.2% without the skill. Only 3 specific Apple-platform details consistently missed (fail in 2 of 3 runs without skill):
+GPT-5.4 now misses 7 of 62 assertions without the skill; 6 of those are recovered by the skill, which lifts the score to 96.8%.
 
-| ID | Topic | Assertion | Why It Matters |
-| --- | --- | --- | --- |
-| Q2.3 | queue-creation | Target queue hierarchies for funneling work | Consolidates subsystem queues into a root — controls total thread count |
-| G2.3 | debugging | `dispatchPrecondition` removed in release builds | Must not be used as production logic — only a debug-time assertion |
-| G3.4 | debugging | `dispatchPrecondition` at API boundaries | Proactive contract enforcement at every public concurrent API |
+| Topic | Assertion | Why It Matters |
+| --- | --- | --- |
+| debugging | Traces the call paths - NetworkManager callback vs ProductCell configure | Connects TSan output back to the concrete racing read/write sites. |
+| dispatch-primitives | Identifies deinit must call `timer?.cancel()` not just set to nil | Prevents leaked dispatch sources and callbacks firing after teardown. |
+| dispatch-primitives | Identifies barrier on global queue is silently ignored | Catches a synchronization bug that looks correct but provides no protection. |
+| dispatch-primitives | Identifies weak self guard returns without `leave()` - causes hang | Prevents `DispatchGroup` deadlocks from unbalanced enter/leave paths. |
+| operation-queue | CRITICAL: Identifies missing KVO notifications (`willChangeValue`/`didChangeValue`) | `AsyncOperation` correctness depends on KVO for `isExecuting` and `isFinished`. |
+| thread-safety | Identifies `os_unfair_lock` as stored property causes memory corruption | Prevents a Swift-specific lock storage bug that can corrupt memory. |
 
-### Key Discriminating Assertions (Gemini 3.1 Pro — missed without skill)
-
-Gemini 3.1 Pro is a stronger baseline (83.9% vs GPT-5.4's 72.6%), handling all simple cases and most production patterns correctly. The 10 remaining gaps are exclusively Apple-specific and WWDC-level details:
-
-| Topic | ID | Assertion | Why It Matters |
-| --- | --- | --- | --- |
-| queue-creation | Q2.1 | Scattered `global()` calls cause thread explosion and lack control | Root cause of the most common thread explosion pattern |
-| queue-creation | Q2.2 | WWDC 2017-706 or 3-4 subsystem queues recommendation | Apple's authoritative guidance for queue architecture |
-| queue-creation | Q2.3 | Target queue hierarchies for funneling work | Controls total thread count across subsystems |
-| queue-creation | Q3.3 | `.background` QoS may halt in Low Power Mode | Apple silently throttles/halts background queues |
-| thread-explosion | E2.2 | `DispatchSemaphore` as mutex lacks priority donation | Priority inversion; NSLock or `os_unfair_lock` required |
-| thread-explosion | E3.2 | `.background` QoS may halt entirely in Low Power Mode | Same Apple-specific halting behavior |
-| thread-explosion | E3.3 | WWDC 2017-706 / scattered `global()` calls problem | Architecture-level fix for thread explosion |
-| thread-safety | T3.3 | `global()` calls may return different queue instances | Barrier writes on assumed-same queue silently become no-ops |
-| debugging | G2.3 | `dispatchPrecondition` is removed in release builds | Must not be used as production logic — only as a debug assertion |
-| debugging | G3.4 | `dispatchPrecondition` at API boundaries | Proactive contract enforcement at every public concurrent API |
 
 ## What This Skill Changes
 
@@ -110,7 +85,7 @@ Gemini 3.1 Pro is a stronger baseline (83.9% vs GPT-5.4's 72.6%), handling all s
 ## Install
 
 ```bash
-npx skills add rusel95/ios-agent-skills --skill gcd-operations
+npx skills add git@git.epam.com:epm-ease/research/agent-skills.git --skill gcd-operationqueue --copy
 ```
 
 Verify installation by asking your AI agent to review concurrent code — it should detect deadlock patterns, recommend proper lock selection, and reference `dispatchPrecondition`.
@@ -130,4 +105,4 @@ Verify installation by asking your AI agent to review concurrent code — it sho
 
 ## Author
 
-[Ruslan Popesku](https://github.com/rusel95)
+[Ruslan Popesku](https://git.epam.com/Ruslan_Popesku)

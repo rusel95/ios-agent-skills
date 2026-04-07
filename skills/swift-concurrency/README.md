@@ -19,7 +19,7 @@ Enterprise-grade skill for Swift Concurrency on Apple platforms. Prevents the mo
 ## Install
 
 ```bash
-npx skills add rusel95/ios-agent-skills --skill swift-concurrency
+npx skills add git@git.epam.com:epm-ease/research/agent-skills.git --skill swift-concurrency
 ```
 
 Verify installation by asking your AI agent to review async/await code — it should detect cooperative pool blocking, check continuation safety, warn about actor reentrancy, and reference Swift 6.2 behavioral changes.
@@ -57,8 +57,8 @@ Tested on **21 scenarios** with **40 discriminating assertions**.
 | Model | With Skill | Without Skill | Delta | A/B Quality |
 | --- | --- | --- | --- | --- |
 | **Sonnet 4.6** | 40/40 (100%) | 27/40 (67.5%) | **+32.5%** | **15W 9T 0L** (avg 8.9 vs 8.5) |
-| **GPT-5.4** | 100% | 82.2% | **+17.8%** | **20/24 wins**, 4 ties (avg 8.5 vs 7.4) |
-| **Gemini 3.1 Pro** | 100% | 64.4% | **+35.6%** | **23/24 wins**, 1 tie (avg 8.9 vs 7.1) |
+| **GPT-5.4** | 38/40 (95.0%) | 32/40 (80.0%) | **+15.0%** | **21W 0T 0L** (avg 9.0 vs 7.6) |
+| **Gemini 3.1 Pro** | 40/40 (100%) | 18/40 (45.0%) | **+55.0%** | **21W** 0T 0L (avg 9.2 vs 7.3) |
 
 > A/B Quality: blind judge scores each response 0–10 and picks the better one without knowing which used the skill. Position (A/B) is randomized across evals to prevent bias.
 
@@ -75,59 +75,29 @@ Tested on **21 scenarios** with **40 discriminating assertions**.
 
 ### Results (GPT-5.4)
 
-| Difficulty | With Skill | Without Skill | Delta | A/B Quality |
-| --- | --- | --- | --- | --- |
-| Simple | 22/22 (100%) | 18/22 (81.8%) | **+18.2%** | **6/8 wins**, 2 ties (avg 8.3 vs 7.6) |
-| Medium | 24/24 (100%) | 22/24 (91.7%) | **+8.3%** | **6/8 wins**, 2 ties (avg 8.5 vs 7.4) |
-| Complex | 27/27 (100%) | 20/27 (74.1%) | **+25.9%** | **8/8 wins** (avg 8.9 vs 7.2) |
-| **Total** | **73/73 (100%)** | **60/73 (82.2%)** | **+17.8%** | **20/24 wins**, 4 ties (avg 8.5 vs 7.4) |
+| Metric | Value |
+| --- | --- |
+| With Skill | 38/40 (95.0%) |
+| Without Skill | 32/40 (80.0%) |
+| Delta | **+15.0%** |
+| A/B | **21W 0T 0L** (avg 9.0 vs 7.6) |
 
-### Results (Gemini 3.1 Pro)
-
-| Difficulty | With Skill | Without Skill | Delta | A/B Quality |
-| --- | --- | --- | --- | --- |
-| Simple | 22/22 (100%) | 18/22 (81.8%) | **+18.2%** | **7/8 wins**, 1 tie (avg 8.7 vs 7.3) |
-| Medium | 24/24 (100%) | 19/24 (79.2%) | **+20.8%** | **8/8 wins** (avg 8.8 vs 7.1) |
-| Complex | 27/27 (100%) | 10/27 (37.0%) | **+63.0%** | **8/8 wins** (avg 9.1 vs 6.8) |
-| **Total** | **73/73 (100%)** | **47/73 (64.4%)** | **+35.6%** | **23/24 wins**, 1 tie (avg 8.9 vs 7.1) |
+**Interpretation:** GPT-5.4 has a solid Swift Concurrency baseline at 80.0% without the skill, rising to 95.0% with it — a +15% delta. The recovered gaps concentrate in cooperative-pool awareness: GPT-5.4 without the skill consistently misses `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1` as a CI testing tool, the CPU-core-count cap on the cooperative pool, `Clock` protocol injection for testable sleeps, and security-specific concurrency patterns (actor coalescing for auth, RFC 6749 single-use refresh token rotation). Blind A/B strongly favors the skill at 21W 0T 0L — no losses — with average quality 9.0 vs 7.6.
 
 ### Key Discriminating Assertions — GPT-5.4
 
 | Topic | Assertion | Why It Matters |
 | --- | --- | --- |
-| cooperative-pool | Pool capped at roughly CPU-core count | Explains why blocked async threads deadlock faster on device |
-| cooperative-pool | Throttle child tasks to `ProcessInfo.processInfo.activeProcessorCount` | Prevents cooperative-pool exhaustion and watchdog kills |
-| actor-isolation | In-flight task coalescing with `[URL: Task<Data, Error>]` | Fixes duplicate fetches caused by actor reentrancy |
-| sendable | Public types are not inferred Sendable across module boundaries | Prevents misleading cross-module API design assumptions |
-| sendable | `sending` parameter as a transfer alternative | Uses a Swift 6 ownership tool instead of unsafe sharing |
-| asyncstream | `onTermination` cleanup for observers and location streams | Prevents infinite producers and leaked system resources |
-| asyncstream | `withDiscardingTaskGroup` for `Void` child tasks | Avoids hidden TaskGroup memory accumulation |
-| cancellation | Synchronous cancellation-handler constraint | Prevents invalid async cleanup inside `withTaskCancellationHandler` |
-| migration | `SWIFT_STRICT_CONCURRENCY=complete` vs Swift 6 mode | Keeps staged migration realistic instead of turning warnings into errors too early |
-| security-concurrency | `withTaskCancellationHandler` + `context.invalidate()` for biometrics | Prevents continuation hangs during cancellation |
-
-### Key Discriminating Assertions — Gemini 3.1 Pro (26 total)
-
-Gemini 3.1 Pro has a stronger simple/medium baseline (81.8%/79.2%) but only 37% on complex tier. The 26 gaps reveal the same cooperative-pool and cancellation specifics, plus additional Swift 6 migration nuances:
-
-| Topic | ID | Assertion | Why It Matters |
-| --- | --- | --- | --- |
-| actor-isolation | AI3.1 | `Task.detached` strips `@MainActor` isolation — use `Task {}` to inherit | Prevents accidental off-main-actor mutations |
-| actor-isolation | AI3.2 | `deinit` is `nonisolated`; accessing `@MainActor` property from `deinit` unsafe in Swift 6 | Critical Swift 6 rule for teardown code |
-| actor-isolation | AI2.2 | In-flight Task coalescing with `[URL: Task<Data, Error>]` | Fixes duplicate fetches caused by actor reentrancy |
-| asyncstream | AS3.1 | `withDiscardingTaskGroup` for Void results to avoid accumulation | Prevents hidden memory growth in long-running services |
-| asyncstream | AS3.3 | Throttle concurrent tasks to `activeProcessorCount` | Prevents pool exhaustion under high concurrency |
-| cancellation | CN3.2 | `withTaskCancellationHandler` to trigger `cancelUpload` on Task cancel | Enables clean resource teardown when caller cancels |
-| cancellation | CN3.3 | Cancellation handler must be **synchronous** and may be called from any thread | Prevents invalid async cleanup inside the handler |
-| cooperative-pool | CP3.1–CP3.4 | `Data(contentsOf:)` blocks cooperative pool; throttle with `activeProcessorCount` | Blocking I/O inside TaskGroup causes watchdog kills |
-| migration | MI1.1 | `SWIFT_STRICT_CONCURRENCY=complete` (warnings) vs Swift 6 mode (errors) | Allows staged adoption without breaking the build |
-| security | SC3.4 | `withTaskCancellationHandler` + `context.invalidate()` to prevent continuation hangs | Biometric auth must be explicitly cancelled |
+| cooperative-pool | Cooperative pool is capped at CPU-core count (4-10 threads on iPhones) | Explains why blocked async work deadlocks faster on device than simulator. |
+| cooperative-pool | `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1` exposes cooperative pool blocking in tests | Makes pool exhaustion reproducible in CI before it hits production. |
+| cooperative-pool | `Clock` protocol injection for testable `sleep` durations | Lets retry/backoff logic run deterministically in tests. |
+| migration | `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1` for exposing blocking during migration | Surfaces regressions as tests fail, not as watchdog crashes. |
+| security-concurrency | Convert `BiometricAuthManager` to actor with Task coalescing | Prevents concurrent authentication races at the security boundary. |
+| security-concurrency | OAuth token rotation (RFC 6749) requires single-use refresh tokens | Prevents replay attacks during concurrent refresh races. |
 
 > Raw data:
-> `swift-concurrency-workspace/iteration-1/benchmark-gpt-5-4-tiered.json`
->
-> `swift-concurrency-workspace/iteration-1/benchmark-gemini-3-1-pro-tiered.json`
+> `workspaces/ios/swift-concurrency/iteration-6/benchmark-gpt-5-4.json`
 
 ## Author
 
-[Ruslan Popesku](https://github.com/rusel95)
+[Ruslan Popesku](https://git.epam.com/Ruslan_Popesku)

@@ -236,7 +236,7 @@ Full audits on large codebases (500+ Swift files) consume significant tokens. Us
 1. **Run `scripts/quick-scan.sh` first** — zero token cost, whole-repo grep for CRITICAL/HIGH patterns across every file. Paste output into the conversation.
 2. **Agent scans in parallel with own tools** — grep-based CRITICAL/HIGH detection using search tools covers patterns requiring context the script misses (multi-line calls, indirect key references, data-flow). Both together = maximum depth.
 3. **Use Sonnet for contextual analysis** — data-flow reasoning, false-positive filtering, cross-file checks
-4. **Use Sonnet/Opus for fix generation** — secure replacement code must be correct
+4. **Use Sonnet for fix generation** — secure replacement code must be correct
 
 This reduces audit cost by 60-80%. See `references/audit-workflow.md` for detailed model-to-phase mapping.
 

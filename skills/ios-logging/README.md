@@ -75,46 +75,41 @@ Setting up these connections means your AI assistant can investigate production 
 | PII compliance, GDPR/CCPA, privacy manifests | `references/pii-compliance.md` |
 | Centralized error handling, retry patterns, extensions | `references/enterprise-patterns.md` |
 
-## Benchmark Results (Sonnet 4.6)
+## Benchmark Results
+
+Tested on **27 scenarios** with **91 discriminating assertions**.
+
+### Results Summary
+
+| Model | With Skill | Without Skill | Delta | A/B Quality |
+|-------|-----------|--------------|-------|-------------|
+| **Sonnet 4.6** | 84/91 (92.3%) | 83/91 (91.2%) | **+1.1%** | **23W 3T 1L** (avg 9.0 vs 8.5) |
+| **GPT-5.4** | 91/91 (100%) | 43/91 (47.2%) | **+52.8%** | **23W 0T 4L** (avg 8.8 vs 8.2) |
+| **Gemini 3.1 Pro** | 82/82 (100%) | 68/82 (82.9%) | **+17.1%** | **24W** 0T 0L (avg 9.2 vs 6.3) |
+
+> **Note on Gemini 3.1 Pro:** 24 of 27 evals had real responses; 3 evals were missing (centralized-error-handler-swiftui, categorized-error-routing, operational-pii-leaks) so totals are out of 82 assertions. With the skill, Gemini answered every assertion correctly (82/82). Without the skill, gaps concentrate in URLSession status validation (4/7, 57%), BGTask logging (5/7, 71%), and missing upstream Combine error handling. Privacy/crash-SDK/MetricKit topics scored 100% in both variants — strong baseline knowledge in those areas.
+
+### Results (Sonnet 4.6)
 
 | Config | Pass | Total | Rate |
 |--------|------|-------|------|
-| **With Skill** | 89 | 91 | 97.8% |
-| **Without Skill** | 58 | 91 | 63.7% |
-| **Delta** | | | **+34.1%** |
+| **With Skill** | 84 | 91 | 92.3% |
+| **Without Skill** | 83 | 91 | 91.2% |
+| **Delta** | | | **+1.1%** |
 
-### Blind A/B Quality Scoring
+### Blind A/B Quality Scoring (Sonnet 4.6)
 
-**25W 0T 2L** — avg 8.6↑7.4 (with-skill ↑ without-skill)
+**23W 3T 1L** — avg 9.0↑8.5 (with-skill ↑ without-skill)
 
 27 evals scored blind by a judge who doesn't know which response used the skill. Position randomized per eval.
 
-### Strongest Discriminating Topics
+**Interpretation:** Sonnet 4.6 already has strong logging knowledge — the baseline passes 91.2% of assertions. The skill's discriminating value concentrates in niche details (MetricKit opt-in coverage, dSYM symbolication, `.private(mask: .hash)` vs `.sensitive` distinction, `.notice` vs `.info` persistence). The A/B quality scoring shows the skill consistently produces more thorough responses (23 wins, 1 loss) — advantage is in depth and operational completeness, not missing core knowledge.
 
-| Topic | With Skill | Without Skill | Delta |
-|-------|-----------|--------------|-------|
-| centralized-error-handling | 100% | 0% | +100% |
-| combine-pipeline-death | 100% | 33% | +67% |
-| pii-compliance | 100% | 38% | +63% |
-| crash-sdk-selection | 83% | 33% | +50% |
-| metrickit | 100% | 50% | +50% |
-| retry-with-backoff | 100% | 50% | +50% |
-| task-error-swallowing | 100% | 50% | +50% |
-| urlsession-status-codes | 100% | 50% | +50% |
+### Grader Comparison: Opus vs Sonnet
 
-### Non-Discriminating Topics (baseline already strong)
+A sample re-grade of discriminating evals with Sonnet 4.6 as grader found **full agreement** on the failures, with one exception: Sonnet was **stricter** on the `.sensitive` vs `.private(mask: .hash)` distinction (Opus passed it as "equivalent concept", Sonnet correctly failed it as the wrong API). This confirmed two skill bugs that have since been fixed.
 
-| Topic | With Skill | Without Skill | Delta |
-|-------|-----------|--------------|-------|
-| background-tasks | 100% | 100% | 0% |
-| cancellation-error | 100% | 100% | 0% |
-| error-reporter-protocol | 100% | 100% | 0% |
-| notification-silent-failures | 100% | 100% | 0% |
-| objc-bridge-edge-case | 100% | 100% | 0% |
-| operational-pii-leaks | 100% | 100% | 0% |
-| print-replacement | 100% | 100% | 0% |
-
-> 27 topic-based evals, 91 discriminating assertions, tested on Claude Sonnet 4.6. See `evals/ios-logging/evals.json` for prompts and assertions, `evals/ios-logging/ios-logging-workspace/iteration-2/benchmark.md` for full results.
+> 27 topic-based evals, 91 discriminating assertions, tested on Claude Sonnet 4.6. See `evals/ios-logging/evals.json` for prompts and assertions.
 
 ## Compatibility
 

@@ -2,7 +2,7 @@
 name: mvvm-uikit-architecture
 description: "Use for hands-on UIKit MVVM questions: setting up Combine bindings between UIViewController and ViewModel (@Published + sink), extracting business logic from massive ViewControllers step by step, testing ViewModels with XCTestExpectation + Combine publishers, fixing [weak self] retain cycles in sink closures, migrating DispatchQueue/GCD completion handlers to Combine, or replacing reloadData() with DiffableDataSource. Also covers Coordinator navigation patterns, constructor injection, ViewState enum, and incremental MVC-to-MVVM refactoring. Trigger on any UIKit architecture decision — even when the user doesn't mention 'MVVM' explicitly."
 metadata:
-  version: 1.0.2
+  version: 1.0.4
 ---
 
 > **Approach: Production-First Iterative Refactoring** — This skill is built for production enterprise codebases where stability and reviewability matter more than speed. Architecture changes are delivered through iterative refactoring — small, focused PRs (≤200 lines, single concern) tracked in a `refactoring/` directory. Critical safety issues ship first; cosmetic improvements come last.
@@ -151,7 +151,27 @@ When generating tests, ALWAYS:
 1. Use protocol mocks with `var stubbed*` and `var *CallCount` tracking
 2. Test through public interface, never test private methods
 3. Use `XCTestExpectation` + `sink` + `dropFirst()` for Combine publisher tests
-4. Use `await fulfillment(of:)` for async tests — NEVER `wait(for:)` in async contexts (deadlocks)
+4. Use `await fulfillment(of:)` for async tests — NEVER `wait(for:)` in async contexts. When you write async test code in a response, the **actual code example must call `await fulfillment(of: [expectation], timeout: 2.0)`**, not `wait(for: [expectation], timeout: 2.0)`. Mentioning the modern API only in a note while the code uses `wait(for:)` still hangs the test — it's the classic cooperative-pool deadlock. In XCTestCase this is a synchronous blocking call that cannot pump the queue, so the expectation never fulfills:
+
+```swift
+// ❌ WRONG — deadlocks in async test function
+func test_load_updates_items() async {
+    let exp = expectation(description: "items updated")
+    let cancellable = sut.$items.dropFirst().sink { _ in exp.fulfill() }
+    await sut.load()
+    wait(for: [exp], timeout: 2.0)  // cooperative-pool deadlock
+    _ = cancellable
+}
+
+// ✅ CORRECT — releases the cooperative thread via await
+func test_load_updates_items() async {
+    let exp = expectation(description: "items updated")
+    let cancellable = sut.$items.dropFirst().sink { _ in exp.fulfill() }
+    await sut.load()
+    await fulfillment(of: [exp], timeout: 2.0)
+    _ = cancellable
+}
+```
 5. Include memory leak detection with `addTeardownBlock { [weak sut] in XCTAssertNil(sut) }`
 
 ## Fallback Strategies & Loop Breakers
@@ -189,8 +209,8 @@ Before finalizing generated or refactored code, verify ALL:
 
 | Project's concurrency stack | Companion skill | Apply when |
 |---|---|---|
-| `async/await`, actors, Swift 6 (migrating or greenfield) | `skills/swift-concurrency/SKILL.md` | Migrating completion handlers, writing async ViewModel methods, actor-based state |
-| `DispatchQueue`, `OperationQueue` (staying or auditing existing) | `skills/gcd-operationqueue/SKILL.md` | Reviewing existing queue code, writing queue-based concurrency, thread-safe collections |
+| `async/await`, actors, Swift 6 (migrating or greenfield) | `skills/ios/epam-swift-concurrency/SKILL.md` | Migrating completion handlers, writing async ViewModel methods, actor-based state |
+| `DispatchQueue`, `OperationQueue` (staying or auditing existing) | `skills/ios/epam-gcd-operationqueue/SKILL.md` | Reviewing existing queue code, writing queue-based concurrency, thread-safe collections |
 | Mixed (GCD stays, new code gets async/await) | Both skills | Apply GCD rules to existing code, concurrency rules to new code |
 
 **If unclear, ask:** "Is the team migrating to Swift Concurrency or keeping GCD/OperationQueue?"

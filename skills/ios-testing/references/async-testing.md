@@ -2,7 +2,7 @@
 
 ## How to Use This Reference
 
-Read this when writing tests for `async/await` functions, testing `@MainActor`-isolated code, testing loading/error state transitions deterministically, injecting `Clock` for time-dependent logic, or testing `AsyncStream` producers. See also the swift-concurrency skill for TSan and Instruments guidance.
+Read this when writing tests for `async/await` functions, testing `@MainActor`-isolated code, testing loading/error state transitions deterministically, injecting `Clock` for time-dependent logic, or testing `AsyncStream` producers. See also the epam-swift-concurrency skill for TSan and Instruments guidance.
 
 ---
 
@@ -27,7 +27,7 @@ The most common async testing mistake is asserting intermediate state (e.g., `is
 
 ## withMainSerialExecutor -- Deterministic State Transitions
 
-`withMainSerialExecutor` (from Point-Free's `swift-concurrency-extras`) forces the cooperative thread pool to be serial.
+`withMainSerialExecutor` (from Point-Free's `epam-swift-concurrency-extras`) forces the cooperative thread pool to be serial.
 
 ```swift
 import ConcurrencyExtras

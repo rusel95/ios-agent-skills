@@ -1,8 +1,8 @@
 ---
 name: ios-logging
-description: "Enterprise skill for iOS production error observability and logging (iOS 15+, Swift 5.5+). Use this skill when writing or reviewing error handling code, adding logging to iOS apps, replacing print() with os.Logger, configuring crash reporting SDKs (Sentry, Crashlytics, PostHog), fixing silent error patterns (try?, Task {} swallowing errors, Combine pipelines dying), adding privacy annotations to logs, integrating MetricKit, implementing retry logic with observability, handling errors in SwiftUI .task {} modifiers, or auditing catch blocks for proper error reporting. Use this skill any time someone writes a catch block, uses try?, creates a Task {}, sets up error handling, or mentions logging, crash reporting, or error tracking in an iOS context — even if they just say 'add error handling' or 'why is this failing silently.'"
+description: "Enterprise skill for iOS production error observability and logging (iOS 15+, Swift 5.5+). The trigger is OBSERVABILITY intent — the user wants errors captured and visible in production, not just handled. Use when: adding os.Logger or replacing print() with structured logging; setting up or integrating a crash SDK (Sentry, Crashlytics, PostHog); auditing error handling for silent failures (catch blocks with no Logger/ErrorReporter call, try? on network/auth/payment operations, Task {} with no do-catch, Combine .replaceError() killing error visibility); adding privacy annotations to logs; integrating MetricKit for OOM/hang detection; or asking why errors are disappearing silently in production. Also use when reviewing any catch block, try?, or Task {} specifically to ensure errors reach a remote crash reporting service — not just for writing error handling in general."
 metadata:
-  version: 1.0.0
+  version: 1.0.3
 ---
 
 # iOS Production Error Observability
@@ -15,8 +15,21 @@ AI coding assistants systematically generate observability-blind code because th
 
 Three non-negotiable rules:
 1. **No `print()` in production code** — use `Logger` with privacy annotations
-2. **No catch block without observability** — every caught error must be logged AND reported to a remote service
+2. **No catch block without observability** — every caught error must be logged; *unexpected* errors must also be reported to a remote crash SDK
 3. **No `try?` on operations where failure matters** — use `do/catch` for network, persistence, auth, and user-facing operations
+
+### Expected vs unexpected errors — don't flood your crash dashboard
+
+Not every caught error is a bug. Reporting every error to the crash SDK makes dashboards useless because real signals drown in noise. Split errors into two buckets:
+
+| Kind | Examples | Logger | Crash SDK |
+|------|----------|:------:|:---------:|
+| **Expected** — user condition or transient, not a bug | `401 unauthorized`, `403 forbidden`, `HTTP 408/429/503 timeout/retry`, offline, cancellation | `.info`/`.notice`/`.warning` (log for context) | **No `recordNonFatal`.** Add a breadcrumb at most. |
+| **Unexpected** — real bug or server failure | `HTTP 500/502`, decoding/contract failure, Core Data validation error, unreachable code path, unknown error | `.error` or `.fault` | **Yes** — `recordNonFatal` with context |
+
+**Why this matters:** A team with a broken login flow cannot tell the difference between 10,000 "expired session" events and one "decoder crash on the checkout screen" if both land in the same bucket. Crash SDK quota (Crashlytics caps non-fatals at 8 per session) also gets consumed by noise before real bugs can be captured.
+
+**Rule of thumb:** Ask "would an on-call engineer want to be paged if this fires 1,000x a day?" If no → log only. If yes → log + `recordNonFatal`. Retries are a special case: breadcrumb each attempt, `recordNonFatal` only after all retries are exhausted (see `references/silent-failures.md` for the retry pattern).
 
 ## Remote Logging SDK Selection
 
@@ -29,6 +42,8 @@ What ecosystem is the project in?
 ├── Needs product analytics + errors       → Sentry (crashes) + PostHog (analytics, session replay)
 └── Enterprise / custom                    → Sentry or Datadog + Google Analytics for funnels
 ```
+
+**dSYM upload is always required** — regardless of which SDK you choose, configure `DEBUG_INFORMATION_FORMAT = DWARF with dSYM File` for all build configurations (including Release) and all targets, then add the SDK's dSYM upload script to Build Phases. Without dSYMs, crash reports and MetricKit stacks show hex addresses instead of function names. This applies to dual-SDK setups too — both SDKs need dSYMs.
 
 Recommend connecting these services via **MCP servers or CLI tools** so the AI assistant can query production errors, search crash patterns, and pull breadcrumb trails directly during debugging sessions:
 - **Sentry**: MCP server available — query issues, search events, get stack traces
@@ -63,15 +78,15 @@ Is this a best-effort operation where failure is genuinely irrelevant?
 Is this production code?
 ├── YES -> os.Logger with privacy annotations
 │   ├── Debug tracing        -> .debug (free in production, not persisted)
-│   ├── Contextual info      -> .info (memory-only, captured on faults)
-│   ├── Operational events   -> .notice (persisted to disk)  ← use for sync completions, milestones
+│   ├── Supplementary context -> .info (memory-only, NOT persisted — only captured alongside faults)
+│   ├── Operational events   -> .notice (persisted to disk)  ← successful sync, background task done, user actions
 │   ├── Recoverable errors   -> .error (always persisted)
 │   └── Bugs / unrecoverable -> .fault (persisted + process chain)
 └── NO (unit tests, playgrounds, scripts)
     └── print() is fine
 ```
 
-⚠️ **Common mistake — `.info` is NOT persisted to disk.** For events that operators or on-call engineers need to see in production logs (sync completions, user actions, background task results), use `.notice`. Only use `.info` for supplementary context you want captured alongside faults but don't need independently.
+⚠️ **Common mistake — `.info` is NOT persisted to disk.** For events that operators or on-call engineers need to see in production logs (successful sync completions, user actions, background task results), use `.notice`. Only use `.info` for supplementary context you want captured alongside faults but don't need independently. When mapping events to levels, ask: "Does someone need to find this log entry independently?" If yes → `.notice`. If it's only useful as context around a fault → `.info`.
 
 ### "Which privacy annotation should I use?"
 
@@ -89,6 +104,13 @@ Do you need the value visible to log readers?
 
 ⚠️ **`.sensitive` ≠ hash.** `.sensitive` always redacts — it is for passwords/tokens that should not appear even in debug logs. It does NOT produce a hash for correlation. For cross-event user correlation without exposing identity, always use `.private(mask: .hash)`.
 
+⚠️ **Operational PII leaks are the most commonly missed risk.** Even when the primary log message looks harmless, these sources silently leak PII:
+- **URL paths** — `/users/john@example.com/profile` embeds an email in the path
+- **Request/response bodies** — raw JSON payloads contain auth tokens, user data
+- **HTTP headers** — `Authorization`, `Cookie`, `X-User-ID` headers carry credentials and identifiers
+- **Database query strings** — `SELECT * FROM users WHERE email = 'jane@...'`
+Always log safe summaries (endpoint path, status code, payload size, operation name) instead of raw values. See `references/pii-compliance.md` for redaction patterns.
+
 ### "How should this catch block look?"
 
 ```
@@ -104,6 +126,16 @@ catch {
 }
 ```
 
+### "Setting up MetricKit?" — Three non-negotiable points
+
+When discussing MetricKit setup, always cover all three:
+
+1. **Process `pastDiagnosticPayloads` on startup** — MetricKit delivers diagnostics up to once per day. Previous payloads sit in `MXMetricManager.shared.pastDiagnosticPayloads` and must be processed at launch, or that session's diagnostic data is lost forever.
+2. **dSYM symbolication required on the server** — Call stacks in MetricKit payloads are unsymbolicated hex addresses. You must upload dSYMs to your backend for server-side symbolication — without this, the stacks are useless.
+3. **Coverage depends on user opt-in** — MetricKit data only arrives from devices where the user enabled **"Share with App Developers"** (Settings → Privacy → Analytics). This is not enabled by default on all devices. MetricKit complements in-process crash reporters but does not replace them for full coverage.
+
+See `references/metrickit.md` for complete setup code and comparison table.
+
 ### "Is this Task {} safe?"
 
 ```
@@ -115,11 +147,11 @@ Does the Task body contain try or await that can throw?
 
 ## Logging Configuration State
 
-On first use of any scanning workflow, check for `.claude/ios-logging-config.md` in the project root. If it doesn't exist, run the **Configuration Phase** below before scanning. If it exists, read it and use those preferences for all fixes.
+On first use of any scanning workflow, check for `.claude/epam-ios-logging-config.md` in the project root. If it doesn't exist, run the **Configuration Phase** below before scanning. If it exists, read it and use those preferences for all fixes.
 
 ### Configuration Phase (runs once per project)
 
-Ask the user these questions and persist answers to `.claude/ios-logging-config.md`:
+Ask the user these questions and persist answers to `.claude/epam-ios-logging-config.md`:
 
 1. **Crash SDK** — "Which crash reporting SDK does this project use?"
    - Sentry / Firebase Crashlytics / Datadog / Bugsnag / None (os.Logger only)
@@ -142,7 +174,7 @@ Ask the user these questions and persist answers to `.claude/ios-logging-config.
    - Minimal: add logging to existing catch blocks, don't restructure code
    - Full: replace `try?` with `do/catch`, add error states, restructure where needed
 
-### Config file format: `.claude/ios-logging-config.md`
+### Config file format: `.claude/epam-ios-logging-config.md`
 
 ```markdown
 ---
@@ -164,11 +196,11 @@ The config is a simple YAML frontmatter file. The skill reads it at the start of
 
 **When:** User asks to "scan for silent failures", "audit error handling", "find missing logging", "check for try?", or any variant of "make sure nothing fails silently."
 
-This is the primary scanning workflow — modeled after ios-security-audit's Phase 0 → Scan → Report pattern.
+This is the primary scanning workflow — modeled after epam-ios-security-audit's Phase 0 → Scan → Report pattern.
 
 #### Phase 0: Discover & Configure
 
-1. **Check for `.claude/ios-logging-config.md`** — if missing, run Configuration Phase above
+1. **Check for `.claude/epam-ios-logging-config.md`** — if missing, run Configuration Phase above
 2. **Discover project structure:**
    - Scan for `.xcodeproj`/`.xcworkspace` to list all targets
    - Count `.swift` files per target
@@ -269,7 +301,7 @@ After the report, offer: "Should I fix these? I'll use [SDK from config] and [fi
 
 **When:** Setting up observability for an iOS project from scratch, or migrating from print() to Logger.
 
-1. **Run Configuration Phase** if `.claude/ios-logging-config.md` doesn't exist
+1. **Run Configuration Phase** if `.claude/epam-ios-logging-config.md` doesn't exist
 2. Create Logger extensions with subsystem/category (`references/logger-setup.md`)
 3. Create ErrorReporter protocol and SDK implementation (`references/crash-sdk-integration.md`)
 4. Audit all `print()` calls — replace with appropriate Logger level
@@ -322,10 +354,10 @@ After the report, offer: "Should I fix these? I'll use [SDK from config] and [fi
 
 This connectivity is what makes remote logging truly powerful — instead of context-switching to dashboards, your debugging workflow stays in the editor.
 
-## Reference Files
+## References
 
-| File | When to read |
-|------|-------------|
+| Reference | When to Read |
+|-----------|-------------|
 | `references/silent-failures.md` | Writing or reviewing error handling code, diagnosing vanishing errors |
 | `references/logger-setup.md` | Setting up os.Logger, choosing log levels, adding privacy annotations |
 | `references/crash-sdk-integration.md` | Integrating Sentry/Crashlytics/PostHog, ErrorReporter protocol, breadcrumbs |

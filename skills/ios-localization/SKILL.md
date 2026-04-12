@@ -1,8 +1,8 @@
 ---
 name: ios-localization
-description: "Production-grade iOS localization skill covering String Catalogs (.xcstrings), CLDR pluralization, SwiftUI/UIKit localization APIs, RTL layout, date/number/currency formatting, and enterprise patterns (modular apps, white-label, accessibility localization). This skill should be used when creating or editing localized iOS strings, working with .xcstrings or .strings files, implementing pluralization, formatting dates/numbers/currencies for display, building RTL-compatible layouts, localizing accessibility labels, setting up localization in Swift Packages, or reviewing code for localization correctness. Use this skill any time someone is working with iOS localization, i18n, l10n, String Catalogs, plural rules, RTL, date formatting, or translated strings — even if they only say 'add a string' or 'format this date' or 'make this work in Arabic.' Also use when generating ANY new user-facing iOS code, because AI coding assistants systematically produce broken localization (hardcoded strings, missing plural categories, wrong date formats, left/right instead of leading/trailing) and this skill corrects those patterns. For .xcstrings files that are too large for direct editing, use the bundled Python scripts in scripts/ to validate, add entries, audit completeness, and fix plural categories programmatically."
+description: "Production-grade iOS localization skill covering String Catalogs (.xcstrings), CLDR pluralization, SwiftUI/UIKit localization APIs, RTL layout, date/number/currency formatting, and enterprise patterns (modular apps, white-label, accessibility localization). This skill should be used when creating or editing localized iOS strings, working with .xcstrings or .strings files, implementing pluralization, formatting dates/numbers/currencies for display, building RTL-compatible layouts, localizing accessibility labels, setting up localization in Swift Packages, or reviewing code for localization correctness. Use this skill any time someone is working with iOS localization, i18n, l10n, String Catalogs, plural rules, RTL, date formatting, or translated strings — even if they only say 'add a string' or 'format this date' or 'make this work in Arabic.' Also audit any newly generated user-facing iOS code for localization failures before finalizing — AI coding assistants systematically produce broken localization (hardcoded strings, missing plural categories, wrong date formats, left/right instead of leading/trailing) and this skill corrects those patterns. For .xcstrings files that are too large for direct editing, use the bundled Python scripts in scripts/ to validate, add entries, audit completeness, and fix plural categories programmatically."
 metadata:
-  version: 1.0.0
+  version: 1.0.2
 ---
 
 # iOS Localization
@@ -231,7 +231,32 @@ Whether generating new code or reviewing existing code, ALWAYS enforce these rul
 15. Set text alignment to `.natural`, never `.left`. `.natural` auto-adapts to RTL.
 16. Localize ALL accessibility labels and hints. `accessibilityLabel("Close")` in English is broken for every other language. Use `String(localized:)` or localized `Text()`.
 17. For .xcstrings files too large for direct editing, use `scripts/xcstrings_tool.py` to validate, add entries, and audit programmatically.
+18. **Test with the canonical CLDR plural set** — when writing plural tests, use exactly these values: `[0, 1, 2, 3, 4, 5, 10, 11, 12, 14, 20, 21, 22, 25, 100, 101, 111, 1.5]`. This set hits every boundary where Russian/Polish/Arabic categories change (e.g., Russian flips one→few at 2, few→many at 5, then repeats at 11; Polish has different rules at 22; the `1.5` catches fraction plurals). Do NOT improvise the set.
+19. **Use one canonical translator comment per key.** Xcode randomizes comment order in `.xcstrings` when the same key is extracted from multiple source locations with different comments — this creates noisy diffs on every build. Fix by extracting the call site to a single helper function or literal, or by overriding the comment in one canonical place.
+20. **.strings and .xcstrings CANNOT coexist with the same table name.** When migrating to String Catalogs, either fully migrate (delete the old `.strings` file) or use a different table name. Mixing results in undefined load-order behavior.
+21. **`.stringsdict` is still required for hidden-count plurals.** Cases where the plural category depends on a count that is NOT displayed in the UI (e.g., "You have messages" where the count is implicit) cannot be modeled in `.xcstrings` plural variations — use a separate `.stringsdict` file for those specific keys.
+22. **For UIKit `NSLocalizedString` with interpolation, ALWAYS use positional specifiers.** `String(format: NSLocalizedString("greeting", comment: ""), name)` requires `%1$@` in the translation, not `%@`. This is the #1 UIKit localization regression — translators CANNOT reorder `%@` placeholders.
+23. **Image assets: separate directional from non-directional.** Logos, photos, avatars, and brand marks must NEVER mirror in RTL — they keep their natural orientation. Only directional icons (arrows, back-buttons, chevrons) should flip. Mark directional assets with `imageFlippedForRightToLeftLayoutDirection()` (UIKit) or `flipsForRightToLeftLayoutDirection(true)` (SwiftUI).
+24. **SwiftUI String interpolation trap.** `Text("Hello, \(name)")` infers `DefaultStringInterpolation` and produces a non-localized `String`, not a `LocalizedStringKey`. To force localization, use `Text("greeting_\(name)", tableName: nil)` with a key that's extracted, or `Text(String(localized: "greeting_\(name)"))`. Simply interpolating into `Text(...)` loses localization.
+25. **Package localization fallback trap.** A missing `bundle: .module` bug appears to work in English because the key matches the fallback value OR because only `Bundle.main` is populated with translations. Always verify by running the app in a non-English language — English-only testing hides this bug completely.
+26. **White-label apps: keep semantic keys stable across brands.** Each brand's runtime bundle override should replace only the translated values, never the keys themselves — renaming keys per brand breaks every shared translation and doubles QA cost.
+27. **Validate VoiceOver in non-English locales.** Localized accessibility labels are only half the battle — pronunciation, number/percent formatting, and date announcements differ per locale. A value like `0.75` must read as "soixante-quinze pour cent" in French, which requires passing the value to `.formatted(.percent)` not `"\(value * 100)%"`.
 </critical_rules>
+
+## String Catalog Enterprise Patterns
+
+**Split catalogs by feature or module** to reduce merge pressure on large teams: `Settings.xcstrings`, `Checkout.xcstrings`, `Auth.xcstrings` instead of one monolithic `Localizable.xcstrings`. Cross-feature duplication is cheap (bytes) — the merge-conflict savings are large.
+
+**Hand-sorting `.xcstrings` JSON as a primary fix is wrong.** Xcode rewrites the file on every build, so sort ordering is not a durable fix. The real fix is one canonical comment per key (rule 19 above) and catalog splitting.
+
+## Testing & QA Tooling
+
+Add these to your localization QA pipeline:
+
+- **`-NSShowNonLocalizedStrings YES`** launch argument — logs every hardcoded (non-localized) string the app displays at runtime. Run the app for 5 minutes with this flag; inspect the console. Every logged string is a missing localization.
+- **Xcode Right-to-Left pseudolanguage** — Scheme → Run → Options → Application Language → "Right-to-Left Pseudolanguage". Validates that all `.leading`/`.trailing` constraints flip correctly AND that text mirrors, without needing to add Arabic translations first.
+- **Double Length pseudolanguage** — same menu, appends padding to every string. Catches fixed-width containers that truncate in German/Finnish before you ship.
+- **CI jobs for RTL and Double Length UI tests** — run the app under both pseudolanguages in CI and capture screenshots for visual diff. This is the only way to catch layout regressions automatically.
 
 <fallback_strategies>
 ## Fallback Strategies & Loop Breakers
@@ -280,10 +305,10 @@ Before finalizing generated or reviewed code, verify ALL:
 
 | Finding type | Companion skill | Apply when |
 |---|---|---|
-| Accessibility labels need localization | `skills/ios-accessibility/SKILL.md` | VoiceOver labels and hints must be localized |
-| SwiftUI architecture for localized ViewModels | `skills/swiftui-mvvm/SKILL.md` | Managing localized state in ViewModels |
-| Testing localization | `skills/ios-testing/SKILL.md` | XCTest with pseudolanguages, locale-specific tests |
-| Security of localized content | `skills/ios-security/SKILL.md` | Format string vulnerabilities in localized strings |
+| Accessibility labels need localization | `skills/ios/epam-ios-accessibility/SKILL.md` | VoiceOver labels and hints must be localized |
+| SwiftUI architecture for localized ViewModels | `skills/ios/epam-swiftui-mvvm-architecture/SKILL.md` | Managing localized state in ViewModels |
+| Testing localization | `skills/ios/epam-ios-testing/SKILL.md` | XCTest with pseudolanguages, locale-specific tests |
+| Security of localized content | `skills/ios/epam-ios-security-audit/SKILL.md` | Format string vulnerabilities in localized strings |
 
 ## References
 

@@ -2,7 +2,7 @@
 name: swift-concurrency
 description: "Use for any Swift Concurrency question on Apple platforms. Triggers on: actor reentrancy (stale state after await), AsyncStream lifecycle (continuation.finish, onTermination), TaskGroup memory and task throttling (activeProcessorCount), Sendable conformance across actor boundaries (non-Sendable third-party types), SWIFT_STRICT_CONCURRENCY=complete error triage ('Sending X risks causing data races'), Swift 6 / 6.2 migration (nonisolated caller-side isolation, @concurrent), cooperative pool blocking, async/await patterns, and continuation misuse. Also covers @MainActor isolation, structured concurrency, and converting callbacks to async/await. Use whenever the query mentions actor, AsyncStream, TaskGroup, Sendable, nonisolated, withCheckedContinuation, or Swift 6."
 metadata:
-  version: 1.1.1
+  version: 1.1.2
 ---
 
 # Swift Concurrency
@@ -84,14 +84,27 @@ Does the API block the current thread?
 
 **When:** Enabling `SWIFT_STRICT_CONCURRENCY=complete` or Swift 6 mode.
 
+**The migration is a THREE-STEP progression, not a binary flip.** Do not jump directly to `complete` or to Swift 6 language mode — you will drown in errors. The canonical progression is:
+
+| Step | Setting | What it does |
+|:----:|---------|--------------|
+| **1. Targeted** | `SWIFT_STRICT_CONCURRENCY=targeted` | Surfaces warnings only in code explicitly marked `Sendable` or in `@preconcurrency` boundaries. Low-noise entry point. Ship this first, fix the surfaced warnings, then advance. |
+| **2. Complete** | `SWIFT_STRICT_CONCURRENCY=complete` | Enables all concurrency checks as **warnings**. Work through each module until the warning count is zero. Still compiles and ships while you migrate. |
+| **3. Swift 6 language mode** | `SWIFT_VERSION=6.0` | Promotes all concurrency checks from warnings to **errors**. Only switch here AFTER the module is clean under `complete`. This is the final gate. |
+
+Most teams spend weeks in step 2 before advancing to step 3. Enabling step 3 prematurely produces hundreds of errors with no actionable incremental path.
+
 1. Start with leaf modules (no internal dependencies) (`references/migration-strategy.md`)
-2. Audit third-party SDKs for Sendable conformance; wrap blockers in actors (`references/migration-strategy.md`)
-3. Fix global mutable state: `static var` → actor, Mutex, or `let` (`references/actor-isolation.md`)
-4. Annotate Sendable on public types; use `sending` where applicable (`references/sendable-transfer.md`)
-5. Check Swift 6.2 caller-side isolation changes (`references/swift-6-2-changes.md`)
-6. Enable per-target in SPM (`references/compiler-flags-ci.md`)
-7. Run TSan + `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1` (`references/testing-debugging.md`)
-8. One PR per module, bottom-up order
+2. Enable **targeted** on the leaf first to surface obvious Sendable gaps
+3. Audit third-party SDKs for Sendable conformance; wrap blockers in actors (`references/migration-strategy.md`)
+4. Fix global mutable state: `static var` → actor, Mutex, or `let` (`references/actor-isolation.md`)
+5. Advance to **complete** on the leaf, fix each warning module by module
+6. Annotate Sendable on public types; use `sending` where applicable (`references/sendable-transfer.md`)
+7. Check Swift 6.2 caller-side isolation changes (`references/swift-6-2-changes.md`)
+8. Only after **complete** is warning-free on the leaf, advance that leaf to **Swift 6 language mode**
+9. Enable per-target in SPM (`references/compiler-flags-ci.md`)
+10. Run TSan + `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1` (`references/testing-debugging.md`)
+11. One PR per module, bottom-up order
 
 ### Workflow: Create New Concurrent Feature
 
@@ -124,7 +137,7 @@ Whether reviewing, generating, or refactoring concurrent code, every output must
 2. Resume every continuation exactly once on every code path -- use `withCheckedThrowingContinuation`
 3. Re-check actor state after every `await` -- actors are reentrant at suspension points
 4. Use `withDiscardingTaskGroup` for fire-and-forget child tasks -- prevents result accumulation memory leaks
-5. Call `continuation.finish()` in AsyncStream's `onTermination` handler
+5. **AsyncStream must use `onTermination` for EVERY external resource cleanup** — NotificationCenter observers, delegate assignments, timers, KVO, Combine subscribers, or any observer/callback registration made inside the stream's setup closure. `deinit` is not sufficient because an AsyncStream can outlive or be dropped independently of its owner; `onTermination` fires when the stream is finished or its task is cancelled, which is exactly when cleanup must run. Always pair every `addObserver`/`delegate = self`/registration call inside the stream setup with a symmetric removal in `onTermination`. Also call `continuation.finish()` from inside `onTermination` when your stream is an infinite observer pattern
 6. Mark public types with explicit `Sendable` conformance -- no automatic inference across module boundaries
 7. Limit TaskGroup child task count for unbounded work -- throttle to `ProcessInfo.processInfo.activeProcessorCount`
 8. Use `@MainActor` annotation for UI isolation, not `MainActor.run {}`

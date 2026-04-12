@@ -1,8 +1,8 @@
 ---
 name: ios-accessibility
-description: "Production-grade iOS accessibility skill covering VoiceOver, Dynamic Type, color contrast, motion, Switch Control, Voice Control, and WCAG 2.2 compliance for both SwiftUI and UIKit. This skill should be used when creating new iOS screens or views, reviewing existing iOS code for accessibility, adding VoiceOver support, fixing Dynamic Type issues, auditing WCAG compliance, implementing accessibilityLabel/traits/hints, grouping elements for assistive technology, adding custom actions or rotors, respecting system accessibility preferences (reduce motion, increase contrast, differentiate without color), writing accessibility-focused XCTest audits, or preparing apps for enterprise compliance (ADA, EAA, Section 508). Use this skill any time someone is working with iOS accessibility, VoiceOver, Dynamic Type, assistive technology, WCAG mapping, or accessibility modifiers in SwiftUI or UIKit — even if they only say 'make this accessible' or 'add VoiceOver support' or 'check contrast.' Also use when generating ANY new SwiftUI or UIKit view code, because AI coding assistants systematically produce inaccessible code by default (hardcoded fonts, onTapGesture instead of Button, missing labels, no system preference checks) and this skill corrects those patterns."
+description: "Production-grade iOS accessibility skill covering VoiceOver, Dynamic Type, color contrast, motion, Switch Control, Voice Control, and WCAG 2.2 compliance for both SwiftUI and UIKit. This skill should be used when creating new iOS screens or views, reviewing existing iOS code for accessibility, adding VoiceOver support, fixing Dynamic Type issues, auditing WCAG compliance, implementing accessibilityLabel/traits/hints, grouping elements for assistive technology, adding custom actions or rotors, respecting system accessibility preferences (reduce motion, increase contrast, differentiate without color), writing accessibility-focused XCTest audits, or preparing apps for enterprise compliance (ADA, EAA, Section 508). Use this skill any time someone is working with iOS accessibility, VoiceOver, Dynamic Type, assistive technology, WCAG mapping, or accessibility modifiers in SwiftUI or UIKit — even if they only say 'make this accessible' or 'add VoiceOver support' or 'check contrast.' Also run an accessibility pass on any newly generated SwiftUI or UIKit view code before finalizing — AI coding assistants systematically produce inaccessible code by default (hardcoded fonts, onTapGesture instead of Button, missing labels, no system preference checks) and this skill corrects those patterns."
 metadata:
-  version: 1.0.0
+  version: 1.0.2
 ---
 
 # iOS Accessibility
@@ -164,6 +164,101 @@ Does the issue make content invisible to assistive technology?
 5. Verify `ScrollView` wraps content that may overflow
 6. Check `@ScaledMetric` usage for non-text dimensions (icons, spacing)
 
+## WCAG 2.2 AA — iOS Quick Reference
+
+Use this table when asked which WCAG criteria apply, what's auto-handled, and what needs manual work. Native iOS platform behavior auto-satisfies many criteria, and **some criteria simply do not apply** to native iOS (they exist for HTML/web).
+
+### Criteria native iOS auto-handles
+
+| Criterion | Why auto |
+|-----------|----------|
+| 1.3.4 Orientation | iOS rotates automatically unless the app locks it |
+| 1.4.4 Resize Text | Dynamic Type handles this when the app uses text styles |
+| 2.1.1 Keyboard | Full Keyboard Access navigates standard controls |
+| 2.4.7 Focus Visible | UIKit/SwiftUI show a focus ring in Full Keyboard Access |
+| 1.4.10 Reflow | Auto Layout + Dynamic Type reflow by default |
+
+### Criteria that require MANUAL work
+
+| Criterion | Manual action |
+|-----------|--------------|
+| **1.1.1 Non-text Content** | Every meaningful image/icon needs `accessibilityLabel`; decorative images need `Image(decorative:)` or `.accessibilityHidden(true)` |
+| 1.3.1 Info and Relationships | Heading traits (`.isHeader`), grouping (`.accessibilityElement(children:)`), table/form structure |
+| 1.4.3 Contrast (AA) | 4.5:1 for body text, 3:1 for large text — test in BOTH light and dark modes independently |
+| 1.4.6 Contrast Enhanced (AAA) | 7:1 body text — required when user enables **Increase Contrast** system setting |
+| **2.5.7 Dragging Movements (WCAG 2.2 NEW)** | Provide single-tap alternative via `accessibilityCustomActions` for any drag operation |
+| **2.5.8 Target Size Minimum (WCAG 2.2 NEW)** | 24×24pt minimum (AA), 44×44pt preferred (Apple HIG) |
+| **3.3.7 Redundant Entry (WCAG 2.2 NEW)** | Auto-fill or remember previously-entered info in multi-step forms |
+| **3.3.8 Accessible Authentication (WCAG 2.2 NEW)** | No cognitive puzzles for login; support paste, password managers, biometrics |
+
+### Criteria that DO NOT apply to native iOS
+
+These are web/HTML-specific — calling them out is important because AI often copies them from web checklists:
+
+- **4.1.1 Parsing** — markup validity. iOS is not HTML; no parsing to validate. (Removed in WCAG 2.2.)
+- **2.4.1 Bypass Blocks** — "skip to main content". iOS uses the VoiceOver rotor instead.
+- **4.1.2 Name, Role, Value** — handled structurally by `accessibilityLabel`/`traits`/`value` in native code, not markup.
+
+When asked "which WCAG criteria apply to iOS", always explicitly name **1.1.1 Non-text Content** as manual (it's the most-missed), identify at least one of the **four NEW 2.2 criteria** (2.5.7, 2.5.8, 3.3.7, 3.3.8), and note that **4.1.1** and **2.4.1** don't apply.
+
+## Specific APIs Quick Reference
+
+These APIs frequently come up in reviews but are easy to forget. Surfaced here from the references so the body of a response can cite them directly.
+
+### Form field label association (SwiftUI)
+
+```swift
+Text("Email:")
+    .accessibilityLabeledPair(role: .label, id: "emailField", in: namespace)
+TextField("", text: $email)
+    .accessibilityLabeledPair(role: .content, id: "emailField", in: namespace)
+```
+
+Use `.accessibilityLabeledPair(role:id:in:)` (iOS 17+) to tell VoiceOver that a separate label view describes a nearby control. Without it, VoiceOver reads them as independent elements and the user doesn't know the label belongs to the field.
+
+### Modal focus trapping (UIKit)
+
+```swift
+modalView.accessibilityViewIsModal = true
+```
+
+Two requirements to make this work:
+1. **Direct-child placement.** `accessibilityViewIsModal` only hides the *siblings* of the modal view — not all other views in the hierarchy. The modal must be a direct child of the container whose siblings you want hidden (typically the window or a top-level container).
+2. **Escape gesture.** Implement `accessibilityPerformEscape` on the modal so the VoiceOver user can dismiss it with a two-finger Z-gesture: `override func accessibilityPerformEscape() -> Bool { dismiss(...); return true }`
+
+### Custom-drawn UIKit elements (canvas, graphs, charts)
+
+When a single `UIView` draws its own hit-testable sub-regions (like bars in a bar chart), expose each region as a separate `UIAccessibilityElement`:
+
+```swift
+override var accessibilityElements: [Any]? {
+    bars.map { bar in
+        let element = UIAccessibilityElement(accessibilityContainer: self)
+        element.accessibilityLabel = "\(bar.label), \(bar.value)"
+        element.accessibilityTraits = .staticText
+        // Use SCREEN coordinates for custom-drawn elements:
+        element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(bar.frame, in: self)
+        return element
+    }
+}
+```
+
+Set `isAccessibilityElement = false` on the parent container so VoiceOver sees the children. Use `UIAccessibility.convertToScreenCoordinates(_:in:)` for the frame — this is the canonical API for custom-drawn views because the system expects screen-space coordinates for hit-testing the VoiceOver cursor. (`accessibilityFrameInContainerSpace` is an alternative but requires the view to be in a standard container hierarchy, which custom-drawn graphs often aren't.)
+
+### UIKit row/cell grouping order
+
+```swift
+cell.shouldGroupAccessibilityChildren = true  // group children into one swipe stop
+titleLabel.accessibilitySortPriority = 2      // read first (higher = earlier)
+subtitleLabel.accessibilitySortPriority = 1   // read second
+```
+
+`shouldGroupAccessibilityChildren` keeps VoiceOver focused on the cell (prevents wandering into children) while `accessibilitySortPriority` controls reading order within the group.
+
+### Screen Curtain test
+
+The gold-standard VoiceOver manual test: enable VoiceOver, then triple-tap with three fingers to toggle **Screen Curtain** — the display goes black while VoiceOver continues. Navigate the screen this way. If you can't complete the task, there's an accessibility gap. Every release checklist should include a Screen Curtain pass for critical flows.
+
 ## Finding Report Template
 
 ```
@@ -201,9 +296,16 @@ Whether generating new code or reviewing existing code, ALWAYS enforce these rul
 11. Don't include the element type in `accessibilityLabel` — say "Play" not "Play button" (VoiceOver adds "button" from the trait).
 12. Use `Image(decorative:)` for decorative images — not `Image("bg").accessibilityHidden(true)`. When images inside a grouped container are purely visual (e.g., star icons in a rating display), hide each individual image with `.accessibilityHidden(true)` and provide a single meaningful description on the parent.
 13. Use `.accessibilityAddTraits(.isToggle)` (iOS 17+) on any custom toggle-like control — VoiceOver announces "Toggle" so users know the control switches between states. Group the toggle's label and visual indicator with `.accessibilityElement(children: .combine)` or `.ignore`.
-14. Use `@ScaledMetric(relativeTo:)` for non-text dimensions (icons, spacing, avatars) so they scale proportionally with Dynamic Type. Wrap content in `ScrollView` for overflow at accessibility text sizes.
-15. Check ALL system accessibility preferences — not just reduce motion. Include `legibilityWeight` (Bold Text), `colorSchemeContrast` (Increase Contrast), `reduceTransparency`, `differentiateWithoutColor`, `invertColors`, and `dynamicTypeSize`. Each has specific replacement patterns documented in references.
-16. For WCAG 2.5.7 (Dragging) and 2.5.8 (Target Size): provide single-tap alternatives for drag operations using `accessibilityCustomActions`, and ensure minimum touch target size of 24×24pt (WCAG) / 44×44pt (Apple HIG).
+14. Use `@ScaledMetric(relativeTo:)` for non-text dimensions — including **image sizes**, icons, spacing, and avatars — so they scale proportionally with Dynamic Type: `@ScaledMetric(relativeTo: .body) var iconSize: CGFloat = 24`. Wrap content in `ScrollView` for overflow at accessibility text sizes. For UIKit labels always set `numberOfLines = 0` so scaled text can wrap. Toolbar/tab bar items should **cap** at `.xxxLarge` via `.dynamicTypeSize(...DynamicTypeSize.xxxLarge)` — unbounded scaling breaks toolbar layouts, and iOS shows a Large Content Viewer for bigger sizes instead.
+15. Check ALL system accessibility preferences — not just reduce motion. Each has an `@Environment` key AND, where applicable, a SwiftUI/UIKit opt-out modifier:
+    - `reduceMotion` — replace motion with crossfade/opacity
+    - `reduceTransparency` — use opaque backgrounds instead of `.ultraThinMaterial`
+    - `legibilityWeight` (Bold Text) — honor via `Font.weight(legibilityWeight == .bold ? .bold : .regular)`
+    - `colorSchemeContrast` — when `.increased`, contrast ratio targets rise from **4.5:1 (AA) to 7:1 (AAA)** for body text; test contrast in BOTH light and dark modes independently
+    - `accessibilityDifferentiateWithoutColor` — never convey status with color alone; add a shape, icon, or pattern
+    - `invertColors` — photos, videos, and correctly-colored icons should opt out via `.accessibilityIgnoresInvertColors(true)` (SwiftUI) or `accessibilityIgnoresInvertColors = true` (UIKit). This property **does not cascade** to child views — apply it on each leaf view that renders photo content.
+    - `dynamicTypeSize` — use `@Environment(\.dynamicTypeSize)` to switch HStack → VStack at `.accessibility1` and above
+16. For WCAG 2.5.7 (Dragging Movements, new in WCAG 2.2) and 2.5.8 (Target Size Minimum): provide single-tap alternatives for drag operations using `accessibilityCustomActions`, and ensure touch target size is at least **24×24pt** (WCAG 2.5.8 AA minimum) or ideally **44×44pt** (Apple HIG). When answering drag-and-drop accessibility questions, cite **WCAG 2.5.7** specifically — it is the criterion that directly applies.
 </critical_rules>
 
 <fallback_strategies>
@@ -219,7 +321,7 @@ Use `.accessibilityRepresentation` to provide an alternative accessible view (e.
 In SwiftUI, use `.accessibilitySortPriority()` (higher = read earlier). In UIKit, override `accessibilityElements` array to define explicit order.
 
 **If modal focus trapping isn't working:**
-In UIKit, verify `accessibilityViewIsModal = true` is on the modal AND the modal is a direct child/sibling at the right level — this property only hides SIBLINGS, not all other views.
+In UIKit, verify `accessibilityViewIsModal = true` is on the modal AND the modal is a **direct child** of the container whose siblings you want hidden — this property only hides SIBLINGS, not all other views. Also implement `accessibilityPerformEscape` on the modal so VoiceOver users can dismiss it with the two-finger Z-gesture. See "Specific APIs Quick Reference → Modal focus trapping" above.
 
 **If Dynamic Type breaks layout at accessibility sizes:**
 Use `ViewThatFits` (iOS 16+) to automatically switch between horizontal and vertical layouts. Wrap content in `ScrollView` for overflow. Use `AnyLayout` to preserve state during layout changes.
@@ -260,10 +362,10 @@ Before finalizing generated or reviewed code, verify ALL:
 
 | Finding type | Companion skill | Apply when |
 |---|---|---|
-| Architecture patterns affecting accessibility | `skills/swiftui-mvvm/SKILL.md` | Structuring ViewModels that manage accessibility state |
-| Security + accessibility overlap (biometric auth) | `skills/ios-security/SKILL.md` | LAContext with proper VoiceOver feedback |
-| Testing accessibility in CI | `skills/ios-testing/SKILL.md` | XCTest accessibility audits, snapshot tests |
-| Concurrency in VoiceOver announcements | `skills/swift-concurrency/SKILL.md` | Posting notifications from async contexts |
+| Architecture patterns affecting accessibility | `skills/ios/epam-swiftui-mvvm-architecture/SKILL.md` | Structuring ViewModels that manage accessibility state |
+| Security + accessibility overlap (biometric auth) | `skills/ios/epam-ios-security-audit/SKILL.md` | LAContext with proper VoiceOver feedback |
+| Testing accessibility in CI | `skills/ios/epam-ios-testing/SKILL.md` | XCTest accessibility audits, snapshot tests |
+| Concurrency in VoiceOver announcements | `skills/ios/epam-swift-concurrency/SKILL.md` | Posting notifications from async contexts |
 
 ## References
 

@@ -2,7 +2,7 @@
 name: swiftui-mvvm-architecture
 description: "Use this skill when working with SwiftUI ViewModels — creating, refactoring, or testing them. Triggers for: setting up a ViewModel for a SwiftUI screen, extracting logic from a View into a ViewModel, migrating from ObservableObject to @Observable, modeling async state (instead of separate Bool flags like isLoading/hasError), injecting dependencies into ViewModels, writing unit tests for @Observable ViewModels, NavigationStack/Router setup, or any question about SwiftUI app architecture. Also use when a SwiftUI View imports too much business logic, when someone asks how to structure a SwiftUI screen 'the modern way,' or when they ask about @State/@Bindable ownership, ViewState patterns, or why their ViewModel shouldn't import SwiftUI."
 metadata:
-  version: 1.0.2
+  version: 1.0.4
 ---
 
 > **Approach: Production-First Iterative Refactoring** — This skill is built for production enterprise codebases where stability and reviewability matter more than speed. Architecture changes are delivered through iterative refactoring — small, focused PRs (≤200 lines, single concern) tracked in a `refactoring/` directory. Critical safety issues ship first; cosmetic improvements come last.
@@ -119,7 +119,48 @@ Whether generating new code or refactoring existing code, every output must be *
 9. Import only `Foundation` (and domain modules) in ViewModels — never `SwiftUI`
 10. Keep every generated file ≤ 400 lines. Extract subviews into dedicated files. Split ViewModel logic into extensions (`MyVM+Search.swift`) or child ViewModels when approaching that limit. For legacy files, log a split task in the feature's `refactoring/` plan instead of forcing it mid-refactor.
 11. Before modifying a View or ViewModel, output a brief `<thought>` analyzing its current state and redraw triggers.
+12. **`@Observable` instances passed to `.environment(...)` must be owned by a stable `@State`** — `.environment(AppTheme())` creates a new `AppTheme` on every parent redraw, which defeats the point of environment injection and breaks observation. Always own it: `@State private var theme = AppTheme()` then `.environment(theme)`.
+13. **ViewModel signals navigation intent via closures; View owns the `@State` toggle.** Instead of `viewModel.router.push(.profile(user))`, the ViewModel exposes `var onOpenProfile: ((User) -> Void)?` and the View sets `.onOpenProfile = { user in path.append(.profile(user)) }` at wire-up time. This keeps the ViewModel ignorant of navigation mechanics (testable, reusable across hosts) while the View remains the single owner of `@State path`.
+14. **`Self._printChanges()` verification steps for splitting views.** When fixing redraw storms, verification is a sequence, not a single check: (1) add `let _ = Self._printChanges()` to both the parent view body AND the split child, (2) type/tap to produce change events, (3) confirm ONLY the target child prints during the interaction — if the parent also prints, it has a hidden read of the changing value (search the body for every `store.property` access and verify equality-only reads use stored, not computed, state), (4) remove both `_printChanges` before committing.
 </critical_rules>
+
+## Anti-Pattern Severity Reference
+
+When auditing a SwiftUI codebase, assign severities from this canonical table. Models systematically mis-classify these — memorize the boundaries.
+
+| Anti-pattern | Severity | Why this level |
+|---|:---:|---|
+| `import SwiftUI` in a ViewModel | 🔴 Critical | ViewModel leaks View-layer types; makes the ViewModel untestable outside a SwiftUI host |
+| `UIViewController`/`UIView` reference inside a ViewModel | 🔴 Critical | Same — hard coupling to UIKit, blocks cross-platform and blocks unit testing |
+| Missing `@MainActor` on a ViewModel that mutates UI-facing state | 🔴 Critical | Undefined behavior — UI reads off-main-thread state, potential crashes |
+| Force-unwrap `!` on an async result in a ViewModel | 🔴 Critical | Crash vector in production |
+| `viewModel` declared as plain `var` without `@State` in the owning View | 🟡 High | A new ViewModel instance is created on every parent redraw — loses all state, fires effects repeatedly |
+| `.onAppear { Task { await viewModel.load() } }` | 🟡 High | Unmanaged: fires on every view appearance (back-nav, tab switch), not tied to task lifetime. Replace with `.task { }` |
+| Business logic in View body (network calls, mutation) | 🟡 High | Breaks reviewability and testability, but not a crash |
+| Separate `isLoading` / `error` / `data` boolean flags on a ViewModel | 🟢 Medium | Functionally works but creates impossible states (`isLoading && error != nil`) — migrate to `ViewState<T>` enum |
+| Missing `// MARK: -` section comments | 🟢 Medium | Cosmetic, affects reviewability |
+| `@StateObject` / `@ObservedObject` / `@EnvironmentObject` in an `@Observable` migration path | 🟢 Medium | Works with legacy `ObservableObject` but should be migrated in phased PRs |
+
+**Decision rules:**
+- **Critical** = crash, data corruption, or blocks all testing
+- **High** = not a crash, but breaks an architectural invariant that cascades (unmanaged tasks, lost state, hidden coupling)
+- **Medium** = functional code with a long-tail maintenance cost or impossible states
+
+## Migration Mapping: `ObservableObject` → `@Observable`
+
+This table must appear verbatim in every "migrate from ObservableObject" response — readers copy it into code reviews.
+
+| Legacy (`ObservableObject`) | Modern (`@Observable`) | Note |
+|---|---|---|
+| `class VM: ObservableObject` | `@Observable class VM` | Add `@MainActor final` if it mutates UI state |
+| `@Published var count` | `var count` | Plain `var` — the macro auto-tracks reads |
+| `@StateObject var vm = VM()` in the owner | `@State private var vm = VM()` | `@State` owns the lifecycle; same semantics |
+| `@ObservedObject var vm: VM` in a child that only reads | `let vm: VM` | No wrapper — plain reference, tracked automatically |
+| `@ObservedObject var vm: VM` in a child that needs `$vm.property` | `@Bindable var vm: VM` | `@Bindable` enables two-way bindings without ownership |
+| `@EnvironmentObject var theme: AppTheme` | `@Environment(AppTheme.self) private var theme` | Type-based lookup; env value must be registered via `.environment(themeInstance)` |
+| `ObservableObject` + `@Published` tests assert on publisher changes | Reads to properties inside `withObservationTracking { }` | Modern Observation framework replaces Combine plumbing |
+
+**Common gotcha:** models often apply `@State` to the VM in the owning view but forget to switch `@ObservedObject` → `let` or `@Bindable` in child views — the whole chain must migrate together or child views won't observe changes.
 
 When generating tests, ALWAYS:
 
@@ -164,8 +205,8 @@ Before finalizing generated or refactored code, verify ALL:
 
 | Project's concurrency stack | Companion skill | Apply when |
 |---|---|---|
-| `async/await`, actors, Swift 6, `@MainActor` | `skills/swift-concurrency/SKILL.md` | Writing async ViewModel methods, Task creation, actor-isolated state |
-| `DispatchQueue`, `OperationQueue` (legacy or hybrid) | `skills/gcd-operationqueue/SKILL.md` | Writing queue-based networking, background work, thread-safe state |
+| `async/await`, actors, Swift 6, `@MainActor` | `skills/ios/epam-swift-concurrency/SKILL.md` | Writing async ViewModel methods, Task creation, actor-isolated state |
+| `DispatchQueue`, `OperationQueue` (legacy or hybrid) | `skills/ios/epam-gcd-operationqueue/SKILL.md` | Writing queue-based networking, background work, thread-safe state |
 
 **If unclear, ask:** "Does this project use Swift Concurrency (async/await) or GCD for async operations?"
 

@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/assertions-850%2B-orange?style=flat-square" alt="assertions"/>
   <img src="https://img.shields.io/badge/scenarios-260%2B-green?style=flat-square" alt="scenarios"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square" alt="license"/></a>
+  <a href="https://lobehub.com/skills?q=rusel95-ios-agent-skills"><img src="https://img.shields.io/badge/LobeHub-Skills_Marketplace-blue?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSIjZmZmIi8+PC9zdmc+" alt="LobeHub"/></a>
 </p>
 
 # iOS Agent Skills

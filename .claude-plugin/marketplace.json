@@ -84,6 +84,27 @@
       "source": "./",
       "strict": false,
       "skills": ["./skills/ios-security"]
+    },
+    {
+      "name": "ios-accessibility",
+      "description": "iOS Accessibility covering VoiceOver, Dynamic Type, color contrast, motion, Switch Control, Voice Control, and WCAG 2.2 compliance for SwiftUI and UIKit.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/ios-accessibility"]
+    },
+    {
+      "name": "ios-localization",
+      "description": "iOS Localization with String Catalogs (.xcstrings), CLDR pluralization, RTL layout, date/number/currency formatting, and enterprise patterns.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/ios-localization"]
+    },
+    {
+      "name": "ios-logging",
+      "description": "iOS production error observability and logging — os.Logger, crash reporting (Sentry/Crashlytics/PostHog), MetricKit, silent error detection.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/ios-logging"]
     }
   ]
 }
